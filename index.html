@@ -1427,6 +1427,34 @@ const StorageAdapter = {
 };
 /* ========================== /STORAGE LAYER ================================ */
 
+/* =============================================================================
+   APP STATE ADAPTER — dipakai bersama oleh Project, Tauris, Folder & File
+   Tambahan (materi), Koneksi DS, dan pengaturan Angkatan/Tag Topik.
+   =============================================================================
+   Modul-modul ini datanya berbentuk satu blob (array/objek) per modul, bukan
+   banyak baris seperti notulensi -- jadi disimpan sebagai satu baris per modul
+   di tabel `app_state` (kolom `key` + `value` jsonb), bukan tabel terpisah per
+   modul. Ini sengaja dibuat generik: tinggal panggil get(key, default) /
+   set(key, value), tanpa perlu bikin adapter baru tiap tambah modul baru.
+   ============================================================================= */
+const APP_STATE_TABLE = 'app_state';
+const AppStateAdapter = {
+  async get(key, defaultValue){
+    if(!sbClient) return defaultValue;
+    const { data, error } = await sbClient.from(APP_STATE_TABLE).select('value').eq('key', key).maybeSingle();
+    if(error){ console.error('Gagal memuat "'+key+'" dari Supabase:', sbErrText(error)); return defaultValue; }
+    return (data && data.value !== undefined && data.value !== null) ? data.value : defaultValue;
+  },
+  async set(key, value){
+    if(!sbClient) return false;
+    const { error } = await sbClient.from(APP_STATE_TABLE)
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    if(error){ console.error('Gagal menyimpan "'+key+'" ke Supabase:', sbErrText(error)); return false; }
+    return true;
+  }
+};
+/* ========================== /APP STATE ADAPTER ============================= */
+
 // Mengonversi satu event JS (di memori) menjadi row siap-kirim ke Supabase --
 // hanya kolom yang memang ada di tabel `notulensi`, plus `id` bila sudah ada.
 function toDbRow(e){
@@ -1646,29 +1674,26 @@ const JENIS_OPTIONS = ['Kelas Pagi','Kelas Malam','Kelas Pemandu','Kelas Pemater
 
 // Topik/kategori materi -- dimensi terpisah dari "Jenis Kelas" di atas (jenis = format sesi,
 // topik = bidang ilmu yang dibahas). Daftar tag-nya sendiri bisa dikelola (CRUD) lewat tombol
-// "Kelola Tag Topik" di halaman Arsip, tersimpan di localStorage supaya tidak hardcode.
-const TOPIK_OPTIONS_KEY = 'ds_topik_options_v1';
+// "Kelola Tag Topik" di halaman Arsip, tersimpan di Supabase (app_state) supaya sinkron di semua
+// perangkat/browser.
 const DEFAULT_TOPIK_OPTIONS = [];
 let TOPIK_OPTIONS = [];
 
-function loadTopikOptions(){
-  try{
-    const raw = localStorage.getItem(TOPIK_OPTIONS_KEY);
-    TOPIK_OPTIONS = raw ? JSON.parse(raw) : [...DEFAULT_TOPIK_OPTIONS];
-  }catch(err){ TOPIK_OPTIONS = [...DEFAULT_TOPIK_OPTIONS]; }
+async function loadTopikOptions(){
+  TOPIK_OPTIONS = await AppStateAdapter.get('topik_options', [...DEFAULT_TOPIK_OPTIONS]);
   // Bersihkan tag preset "Keterampilan" yang mungkin sudah kadung tersimpan dari versi
   // sebelumnya, tapi hanya jika belum pernah dipakai di notulensi manapun (aman dihapus).
   if(TOPIK_OPTIONS.includes('Keterampilan') && !raw_events_use_keterampilan()){
     TOPIK_OPTIONS = TOPIK_OPTIONS.filter(t => t !== 'Keterampilan');
-    saveTopikOptions();
+    await saveTopikOptions();
   }
 }
 function raw_events_use_keterampilan(){
   try{ return events.some(e => splitTopik(e.topik).includes('Keterampilan')); }
   catch(err){ return false; }
 }
-function saveTopikOptions(){
-  localStorage.setItem(TOPIK_OPTIONS_KEY, JSON.stringify(TOPIK_OPTIONS));
+async function saveTopikOptions(){
+  await AppStateAdapter.set('topik_options', TOPIK_OPTIONS);
 }
 
 // ---------- Topik: checkbox group (dipakai form tambah & edit notulensi) ----------
@@ -1724,7 +1749,7 @@ document.addEventListener('click', (ev)=>{
   if(input) setTimeout(()=> input.focus(), 50);
 });
 
-document.getElementById('addTopikTagForm').addEventListener('submit', (e)=>{
+document.getElementById('addTopikTagForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const input = document.getElementById('newTopikTagInput');
   const val = input.value.trim();
@@ -1734,7 +1759,7 @@ document.getElementById('addTopikTagForm').addEventListener('submit', (e)=>{
     return;
   }
   TOPIK_OPTIONS.push(val);
-  saveTopikOptions();
+  await saveTopikOptions();
   input.value = '';
   renderTopikManageTable();
   buildTopikFilter();
@@ -1764,7 +1789,7 @@ document.getElementById('topikManageTableBody').addEventListener('click', async 
     const tag = delBtn.dataset.deleteTopik;
     if(!confirm(`Hapus tag "${tag}"? Notulensi yang sudah pakai tag ini akan kehilangan tag tersebut.`)) return;
     TOPIK_OPTIONS = TOPIK_OPTIONS.filter(t => t!==tag);
-    saveTopikOptions();
+    await saveTopikOptions();
     const changed = [];
     events.forEach(ev=>{
       if(!splitTopik(ev.topik).includes(tag)) return;
@@ -1791,7 +1816,7 @@ document.getElementById('topikManageTableBody').addEventListener('change', async
   }
   const idx = TOPIK_OPTIONS.indexOf(oldName);
   if(idx>-1) TOPIK_OPTIONS[idx] = newName;
-  saveTopikOptions();
+  await saveTopikOptions();
   const changed = [];
   events.forEach(ev=>{
     if(!splitTopik(ev.topik).includes(oldName)) return;
@@ -1804,7 +1829,7 @@ document.getElementById('topikManageTableBody').addEventListener('change', async
   render();
 });
 
-loadTopikOptions();
+// (loadTopikOptions() sekarang dipanggil di dalam initArsipKelas() -- lihat bagian Init di bawah)
 
 function jenisCheckboxGroupHTML(prefix){
   return JENIS_OPTIONS.map(opt =>
@@ -2651,7 +2676,7 @@ function debounce(fn, delay = 200){
 // "muat data dulu, baru render" tetap terjaga tanpa mengubah semua fungsi lain
 // yang memang tidak butuh async.
 (async function initArsipKelas(){
-  await loadEvents();
+  await Promise.all([loadEvents(), loadTopikOptions()]);
   updateStats();
   refreshFilters();
   render();
@@ -2731,19 +2756,13 @@ pembicaraSelect.addEventListener('change', ()=>{
 // Angkatan di halaman Arsip Kelas — lihat definisi TFS di bawah.
 // =====================================================================
 let projectTreeData = [];
-const PROJECT_TREE_KEY = 'ds_project_tree_v1';
 
-function loadProjectTreeData(){
-  try{
-    const raw = localStorage.getItem(PROJECT_TREE_KEY);
-    projectTreeData = raw ? JSON.parse(raw) : [];
-  }catch(err){ console.error('Gagal memuat data Project:', err); projectTreeData = []; }
+async function loadProjectTreeData(){
+  projectTreeData = await AppStateAdapter.get('project_tree', []);
 }
-function saveProjectTreeData(){
-  try{ localStorage.setItem(PROJECT_TREE_KEY, JSON.stringify(projectTreeData)); }
-  catch(err){ console.error('Gagal menyimpan data Project:', err); }
+async function saveProjectTreeData(){
+  await AppStateAdapter.set('project_tree', projectTreeData);
 }
-loadProjectTreeData();
 
 /* ================= Mesin folder generik: TFS (Tree File System) =================
    Dipakai bareng oleh Project dan Materi & Arsip Angkatan (folder dinamis + subfolder
@@ -2872,13 +2891,13 @@ function tfsRenderNodes(nodes, treeKind, depth){
 const TFS_TREES = {
   project: {
     getRoot(){ return projectTreeData; },
-    save(){ saveProjectTreeData(); renderProjectTreePage(); },
+    async save(){ await saveProjectTreeData(); renderProjectTreePage(); },
     container(){ return document.getElementById('projectTreeContainer'); }
   },
   materi: {
     getRoot(){ return materiSubtreeData; },
-    save(){
-      saveMateriSubtreeData();
+    async save(){
+      await saveMateriSubtreeData();
       renderMateriSubtree();
       // Re-render membangun ulang DOM dari nol, jadi filter angkatan yang lagi aktif perlu
       // diterapkan ulang supaya folder yang sedang disembunyikan tetap tersembunyi.
@@ -2914,7 +2933,7 @@ tfsFileInput.addEventListener('change', async () => {
     const folderNode = target.folderId ? tfsFindNode(root, target.folderId) : null;
     const targetArray = folderNode ? (folderNode.children || (folderNode.children = [])) : root;
     targetArray.push({ id: tfsNewId(), type:'file', name: file.name, dataUrl });
-    tree.save();
+    await tree.save();
   }catch(err){
     console.error('Gagal mengunggah file:', err);
     alert('Gagal mengunggah file. Coba lagi.');
@@ -3023,7 +3042,7 @@ document.getElementById('tfsTextModalOverlay').addEventListener('click', (ev)=>{
     tfsPendingTextTarget = null;
   }
 });
-document.getElementById('tfsTextForm').addEventListener('submit', (ev)=>{
+document.getElementById('tfsTextForm').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
   const target = tfsPendingTextTarget;
   if(!target) return;
@@ -3035,13 +3054,13 @@ document.getElementById('tfsTextForm').addEventListener('submit', (ev)=>{
   const folderNode = target.folderId ? tfsFindNode(root, target.folderId) : null;
   const targetArray = folderNode ? (folderNode.children || (folderNode.children = [])) : root;
   targetArray.push({ id: tfsNewId(), type:'text', name: title, content: content });
-  tree.save();
+  await tree.save();
   document.getElementById('tfsTextModalOverlay').classList.remove('open');
   tfsPendingTextTarget = null;
 });
 
 // Delegasi klik tunggal untuk seluruh aksi TFS (tambah subfolder/file/teks, hapus) di semua pohon.
-document.addEventListener('click', (ev) => {
+document.addEventListener('click', async (ev) => {
   const previewLink = ev.target.closest('[data-tfs-preview]');
   if(previewLink){
     ev.preventDefault(); ev.stopPropagation();
@@ -3073,7 +3092,7 @@ document.addEventListener('click', (ev) => {
       if(folderNode){
         if(!folderNode.children) folderNode.children = [];
         folderNode.children.push({ id: tfsNewId(), type:'folder', name: name.trim(), children: [] });
-        tree.save();
+        await tree.save();
       }
     }
     return;
@@ -3109,7 +3128,7 @@ document.addEventListener('click', (ev) => {
       if(parentArr){
         const idx = parentArr.findIndex(n => n.id === id);
         if(idx !== -1) parentArr.splice(idx, 1);
-        tree.save();
+        await tree.save();
       }
     }
     return;
@@ -3135,7 +3154,7 @@ window.renderProjectPage = renderProjectTreePage;
 
 document.getElementById('projectSearch').addEventListener('input', renderProjectTreePage);
 
-function addNewProject(){
+async function addNewProject(){
   const name = prompt('Nama Folder Project Baru:');
   if(!name || !name.trim()) return;
   if(projectTreeData.some(p => p.name.trim().toLowerCase() === name.trim().toLowerCase())){
@@ -3143,12 +3162,15 @@ function addNewProject(){
     return;
   }
   projectTreeData.push({ id: tfsNewId(), type:'folder', name: name.trim(), children: [] });
-  saveProjectTreeData();
+  await saveProjectTreeData();
   renderProjectTreePage();
 }
 document.getElementById('projectAddBtn').addEventListener('click', addNewProject);
 
-renderProjectTreePage();
+(async function initProjectPage(){
+  await loadProjectTreeData();
+  renderProjectTreePage();
+})();
 
 </script>
 
@@ -3227,18 +3249,14 @@ renderProjectTreePage();
 
 <script>
 /* ============================= MODUL BARU: DATABASE PEMATERI ALUMNI ============================= */
-const PEMATERI_KEY = 'ds_alumni_pemateri_v1';
 let pemateriData = [];
 let editingPemateriId = null;
 
-function loadPemateriData(){
-  try{
-    const raw = localStorage.getItem(PEMATERI_KEY);
-    pemateriData = raw ? JSON.parse(raw) : [];
-  }catch(err){ console.error('Gagal memuat data pemateri:', err); pemateriData = []; }
+async function loadPemateriData(){
+  pemateriData = await AppStateAdapter.get('pemateri_list', []);
 }
-function savePemateriData(){
-  localStorage.setItem(PEMATERI_KEY, JSON.stringify(pemateriData));
+async function savePemateriData(){
+  await AppStateAdapter.set('pemateri_list', pemateriData);
 }
 
 function escapeHtmlAlumni(s){
@@ -3337,7 +3355,7 @@ document.getElementById('addPemateriBtn').addEventListener('click', ()=> openPem
 document.getElementById('pemateriCancelBtn').addEventListener('click', closePemateriModal);
 pemateriModal.addEventListener('click', (e)=>{ if(e.target===pemateriModal) closePemateriModal(); });
 
-document.getElementById('pemateriForm').addEventListener('submit', (e)=>{
+document.getElementById('pemateriForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const data = {
     id: editingPemateriId || (Date.now() + Math.floor(Math.random()*1000)),
@@ -3354,7 +3372,7 @@ document.getElementById('pemateriForm').addEventListener('submit', (e)=>{
   } else {
     pemateriData.push(data);
   }
-  savePemateriData();
+  await savePemateriData();
   renderPemateriTable();
   closePemateriModal();
 });
@@ -3376,7 +3394,7 @@ document.getElementById('pemateriDetailCloseBtn').addEventListener('click', ()=>
 detailOverlay.addEventListener('click', (e)=>{ if(e.target===detailOverlay) detailOverlay.classList.remove('open'); });
 
 // ---------- Table event delegation (edit/delete/detail) ----------
-document.getElementById('pemateriTableBody').addEventListener('click', (e)=>{
+document.getElementById('pemateriTableBody').addEventListener('click', async (e)=>{
   const editBtn = e.target.closest('.edit-btn-pemateri');
   if(editBtn){ openPemateriModal(Number(editBtn.dataset.edit)); return; }
   const delBtn = e.target.closest('.delete-btn-pemateri');
@@ -3384,7 +3402,7 @@ document.getElementById('pemateriTableBody').addEventListener('click', (e)=>{
     const id = Number(delBtn.dataset.delete);
     if(confirm('Hapus data pemateri ini?')){
       pemateriData = pemateriData.filter(x=>x.id!==id);
-      savePemateriData();
+      await savePemateriData();
       renderPemateriTable();
     }
     return;
@@ -3393,22 +3411,20 @@ document.getElementById('pemateriTableBody').addEventListener('click', (e)=>{
   if(detBtn){ openDetailModal(Number(detBtn.dataset.detail)); return; }
 });
 
-loadPemateriData();
-renderPemateriTable();
+(async function initPemateriTable(){
+  await loadPemateriData();
+  renderPemateriTable();
+})();
 
 /* ============================= MODUL: FOLDER & UPLOAD MATERI ALUMNI (folder statis DS 10/12/13) ============================= */
-const ALUMNI_FOLDERS_KEY = 'ds_alumni_folders_v1';
 let alumniFolders = {}; // { namaFolderStatis: [ {nama, dataUrl, type, size} ] } -- lampiran langsung di folder statis DS 10/12/13
 let currentUploadTarget = null; // nama folder statis tujuan saat tombol upload diklik
 
-function loadAlumniFolders(){
-  try{
-    const raw = localStorage.getItem(ALUMNI_FOLDERS_KEY);
-    alumniFolders = raw ? JSON.parse(raw) : {};
-  }catch(err){ console.error('Gagal memuat data folder alumni:', err); alumniFolders = {}; }
+async function loadAlumniFolders(){
+  alumniFolders = await AppStateAdapter.get('alumni_folders', {});
 }
-function saveAlumniFolders(){
-  localStorage.setItem(ALUMNI_FOLDERS_KEY, JSON.stringify(alumniFolders));
+async function saveAlumniFolders(){
+  await AppStateAdapter.set('alumni_folders', alumniFolders);
 }
 
 const STATIC_FOLDER_NAMES = ['Materi DS 10','Materi DS 12','Materi DS 13'];
@@ -3462,7 +3478,7 @@ function fileToDataUrl(file){
 }
 
 const fileUploadInput = document.getElementById('fileUploadInput');
-document.addEventListener('click', (e)=>{
+document.addEventListener('click', async (e)=>{
   const uploadBtn = e.target.closest('[data-upload-target]');
   if(uploadBtn){
     currentUploadTarget = uploadBtn.dataset.uploadTarget;
@@ -3476,7 +3492,7 @@ document.addEventListener('click', (e)=>{
     const idx = Number(idxStr);
     if(confirm('Hapus file ini?')){
       alumniFolders[folderName].splice(idx,1);
-      saveAlumniFolders();
+      await saveAlumniFolders();
       refreshFolderView();
     }
     return;
@@ -3498,7 +3514,7 @@ fileUploadInput.addEventListener('change', async ()=>{
     const dataUrl = await fileToDataUrl(file);
     if(!alumniFolders[currentUploadTarget]) alumniFolders[currentUploadTarget] = [];
     alumniFolders[currentUploadTarget].push({ nama: file.name, dataUrl, type: file.type, size: file.size });
-    saveAlumniFolders();
+    await saveAlumniFolders();
     refreshFolderView();
   }catch(err){
     console.error('Gagal mengunggah file:', err);
@@ -3518,15 +3534,11 @@ function refreshFolderView(){
 
 /* ---------- Folder & File Tambahan: folder bebas + subfolder tak terbatas + file (PDF/Excel/PNG/Word) ---------- */
 let materiSubtreeData = [];
-const MATERI_SUBTREE_KEY = 'ds_materi_subtree_v1';
-function loadMateriSubtreeData(){
-  try{
-    const raw = localStorage.getItem(MATERI_SUBTREE_KEY);
-    materiSubtreeData = raw ? JSON.parse(raw) : [];
-  }catch(err){ console.error('Gagal memuat folder tambahan:', err); materiSubtreeData = []; }
+async function loadMateriSubtreeData(){
+  materiSubtreeData = await AppStateAdapter.get('materi_subtree', []);
 }
-function saveMateriSubtreeData(){
-  localStorage.setItem(MATERI_SUBTREE_KEY, JSON.stringify(materiSubtreeData));
+async function saveMateriSubtreeData(){
+  await AppStateAdapter.set('materi_subtree', materiSubtreeData);
 }
 function renderMateriSubtree(){
   const container = document.getElementById('materiSubtreeContainer');
@@ -3535,9 +3547,8 @@ function renderMateriSubtree(){
     ? tfsRenderNodes(materiSubtreeData, 'materi')
     : '<div class="tfs-empty tfs-empty-rich"><b>Belum ada folder tambahan</b><span>Buat folder untuk mengelompokkan materi berdasarkan tema, acara, atau periode.</span></div>';
 }
-loadMateriSubtreeData();
 
-document.getElementById('addFolderBtn').addEventListener('click', ()=>{
+document.getElementById('addFolderBtn').addEventListener('click', async ()=>{
   const name = prompt('Nama folder baru:');
   if(!name || !name.trim()) return;
   if(materiSubtreeData.some(n => n.name.trim().toLowerCase() === name.trim().toLowerCase())){
@@ -3549,7 +3560,7 @@ document.getElementById('addFolderBtn').addEventListener('click', ()=>{
   // bukan di semua angkatan. Kalau saat itu filternya "Semua Angkatan", foldernya juga akan
   // tetap tampil di semua angkatan (bisa diubah nanti lewat dropdown di sebelah nama folder).
   materiSubtreeData.push({ id: tfsNewId(), type:'folder', name: name.trim(), children: [], angkatan: activeAngkatanFilter || '' });
-  saveMateriSubtreeData();
+  await saveMateriSubtreeData();
   renderMateriSubtree();
   applyAngkatanFilterToFolders();
 });
@@ -3562,19 +3573,13 @@ let ANGKATAN_OPTIONS = [];
 let folderAngkatan = {}; // { namaFolder: 'DS 10' }
 let activeAngkatanFilter = '';
 
-function loadAngkatanOptions(){
-  try{
-    const raw = localStorage.getItem(ANGKATAN_OPTIONS_KEY);
-    ANGKATAN_OPTIONS = raw ? JSON.parse(raw) : [...DEFAULT_ANGKATAN_OPTIONS];
-  }catch(err){ ANGKATAN_OPTIONS = [...DEFAULT_ANGKATAN_OPTIONS]; }
+async function loadAngkatanOptions(){
+  ANGKATAN_OPTIONS = await AppStateAdapter.get('angkatan_options', [...DEFAULT_ANGKATAN_OPTIONS]);
 }
-function saveAngkatanOptions(){ localStorage.setItem(ANGKATAN_OPTIONS_KEY, JSON.stringify(ANGKATAN_OPTIONS)); }
+async function saveAngkatanOptions(){ await AppStateAdapter.set('angkatan_options', ANGKATAN_OPTIONS); }
 
-function loadFolderAngkatan(){
-  try{
-    const raw = localStorage.getItem(FOLDER_ANGKATAN_KEY);
-    folderAngkatan = raw ? JSON.parse(raw) : {};
-  }catch(err){ folderAngkatan = {}; }
+async function loadFolderAngkatan(){
+  folderAngkatan = await AppStateAdapter.get('folder_angkatan', {});
   // Folder statis bawaan (Materi DS 10/12/13) otomatis diberi angkatan sesuai namanya kalau belum diset.
   STATIC_FOLDER_NAMES.forEach(name=>{
     if(folderAngkatan[name]) return;
@@ -3582,7 +3587,7 @@ function loadFolderAngkatan(){
     if(m) folderAngkatan[name] = `DS ${m[1]}`;
   });
 }
-function saveFolderAngkatan(){ localStorage.setItem(FOLDER_ANGKATAN_KEY, JSON.stringify(folderAngkatan)); }
+async function saveFolderAngkatan(){ await AppStateAdapter.set('folder_angkatan', folderAngkatan); }
 
 function buildAngkatanFilter(){
   const select = document.getElementById('angkatanFilterSelect');
@@ -3636,39 +3641,44 @@ function renderAngkatanManageTable(){
     <td><button type="button" class="icon-btn danger" data-delete-angkatan="${escapeHtmlAlumni(a)}">🗑 Hapus</button></td>
   </tr>`).join('') : `<tr class="empty-row"><td colspan="3"><span class="glyph">۝</span>Belum ada angkatan.</td></tr>`;
 }
-document.getElementById('addAngkatanForm').addEventListener('submit', (e)=>{
+document.getElementById('addAngkatanForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const input = document.getElementById('newAngkatanInput');
   const val = input.value.trim();
   if(!val) return;
   if(ANGKATAN_OPTIONS.some(a=>a.toLowerCase()===val.toLowerCase())){ alert('Angkatan ini sudah ada.'); return; }
   ANGKATAN_OPTIONS.push(val);
-  saveAngkatanOptions();
+  await saveAngkatanOptions();
   input.value = '';
   renderAngkatanManageTable();
   buildAngkatanFilter();
 });
-document.getElementById('angkatanManageTableBody').addEventListener('click', (e)=>{
+document.getElementById('angkatanManageTableBody').addEventListener('click', async (e)=>{
   const btn = e.target.closest('[data-delete-angkatan]');
   if(!btn) return;
   const val = btn.dataset.deleteAngkatan;
   if(!confirm(`Hapus angkatan "${val}"?`)) return;
   ANGKATAN_OPTIONS = ANGKATAN_OPTIONS.filter(a=>a!==val);
-  saveAngkatanOptions();
+  await saveAngkatanOptions();
   Object.keys(folderAngkatan).forEach(k=>{ if(folderAngkatan[k]===val) delete folderAngkatan[k]; });
-  saveFolderAngkatan();
+  await saveFolderAngkatan();
   renderAngkatanManageTable();
   buildAngkatanFilter();
 });
 
 
 
-loadAlumniFolders();
-refreshFolderView();
-loadAngkatanOptions();
-loadFolderAngkatan();
-renderMateriSubtree();
-buildAngkatanFilter();
+(async function initPemateriAlumniModule(){
+  await Promise.all([
+    loadAlumniFolders(),
+    loadAngkatanOptions(),
+    loadFolderAngkatan(),
+    loadMateriSubtreeData()
+  ]);
+  refreshFolderView();
+  renderMateriSubtree();
+  buildAngkatanFilter();
+})();
 /* ============================= /MODUL BARU: DATABASE PEMATERI ALUMNI ============================= */
 </script>
 
@@ -3676,24 +3686,18 @@ buildAngkatanFilter();
 <script>
 /* ============================= MODUL: TAURIS — struktur folder rekursif (sama seperti Project) ============================= */
 let tauriTreeData = [];
-const TAURI_TREE_KEY = 'ds_tauris_tree_v1';
 
-function loadTauriTreeData(){
-  try{
-    const raw = localStorage.getItem(TAURI_TREE_KEY);
-    tauriTreeData = raw ? JSON.parse(raw) : [];
-  }catch(err){ console.error('Gagal memuat data Tauris:', err); tauriTreeData = []; }
+async function loadTauriTreeData(){
+  tauriTreeData = await AppStateAdapter.get('tauris_tree', []);
 }
-function saveTauriTreeData(){
-  try{ localStorage.setItem(TAURI_TREE_KEY, JSON.stringify(tauriTreeData)); }
-  catch(err){ console.error('Gagal menyimpan data Tauris:', err); }
+async function saveTauriTreeData(){
+  await AppStateAdapter.set('tauris_tree', tauriTreeData);
 }
-loadTauriTreeData();
 
 // Daftarkan pohon Tauris ke registry TFS yang sama dipakai Project & Materi Subtree.
 TFS_TREES.tauris = {
   getRoot(){ return tauriTreeData; },
-  save(){ saveTauriTreeData(); renderTauriTreePage(); },
+  async save(){ await saveTauriTreeData(); renderTauriTreePage(); },
   container(){ return document.getElementById('tauriTreeContainer'); }
 };
 
@@ -3714,7 +3718,7 @@ function renderTauriTreePage(){
 
 document.getElementById('tauriSearch').addEventListener('input', renderTauriTreePage);
 
-function addNewTauri(){
+async function addNewTauri(){
   const name = prompt('Nama Folder Taurid Baru:');
   if(!name || !name.trim()) return;
   if(tauriTreeData.some(n => n.name.trim().toLowerCase() === name.trim().toLowerCase())){
@@ -3722,12 +3726,15 @@ function addNewTauri(){
     return;
   }
   tauriTreeData.push({ id: tfsNewId(), type:'folder', name: name.trim(), children: [] });
-  saveTauriTreeData();
+  await saveTauriTreeData();
   renderTauriTreePage();
 }
 document.getElementById('addSopBtn').addEventListener('click', addNewTauri);
 
-renderTauriTreePage();
+(async function initTaurisPage(){
+  await loadTauriTreeData();
+  renderTauriTreePage();
+})();
 /* ============================= /MODUL: TAURIS ============================= */
 </script>
 
