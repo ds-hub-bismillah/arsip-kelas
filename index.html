@@ -2897,6 +2897,7 @@ function tfsRenderNodes(nodes, treeKind, depth){
             '<button type="button" class="tfs-mini-btn" data-tfs-tree="'+treeKind+'" data-tfs-add-folder="'+fd.id+'">+ Subfolder</button>' +
             '<button type="button" class="tfs-mini-btn" data-tfs-tree="'+treeKind+'" data-tfs-add-file="'+fd.id+'">+ File</button>' +
             (treeKind === 'tauris' ? '<button type="button" class="tfs-mini-btn" data-tfs-tree="'+treeKind+'" data-tfs-add-text="'+fd.id+'">+ Teks</button>' : '') +
+            '<button type="button" class="tfs-mini-btn" data-tfs-tree="'+treeKind+'" data-tfs-rename="'+fd.id+'">Ganti Nama</button>' +
             '<button type="button" class="tfs-mini-btn danger" data-tfs-tree="'+treeKind+'" data-tfs-delete="'+fd.id+'">Hapus</button>' +
           '</span>' +
         '</summary>' +
@@ -3134,6 +3135,35 @@ document.addEventListener('click', async (ev) => {
         await tree.save();
       }
     }
+    return;
+  }
+
+  const renameBtn = ev.target.closest('[data-tfs-rename]');
+  if(renameBtn){
+    ev.preventDefault(); ev.stopPropagation();
+    const treeKind = renameBtn.dataset.tfsTree;
+    const id = renameBtn.dataset.tfsRename;
+    const tree = TFS_TREES[treeKind];
+    const root = tree.getRoot();
+    const node = tfsFindNode(root, id);
+    if(!node) return;
+    const newName = prompt('Nama baru untuk folder ini:', node.name);
+    if(newName === null) return; // batal (Cancel)
+    const trimmed = newName.trim();
+    if(!trimmed){
+      alert('Nama folder tidak boleh kosong.');
+      return;
+    }
+    if(trimmed === node.name) return; // tidak berubah, tidak perlu simpan
+    // Cegah nama bentrok dengan folder lain yang levelnya sama (siblings).
+    const siblings = tfsFindParentArray(root, id) || root;
+    const nameClash = siblings.some(n => n.id !== id && n.type === 'folder' && n.name.trim().toLowerCase() === trimmed.toLowerCase());
+    if(nameClash){
+      alert('Sudah ada folder lain dengan nama yang sama di level ini.');
+      return;
+    }
+    node.name = trimmed;
+    await tree.save();
     return;
   }
 
