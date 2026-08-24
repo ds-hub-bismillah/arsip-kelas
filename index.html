@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Arsip Kelas — Darush Shalihat</title>
+<title>Arsip Kelas Darush Shalihat</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -711,6 +711,10 @@
     background:var(--parchment);
     color:var(--brass);
   }
+  .tfs-file-description{
+    font-size:12px; color:var(--ink-soft); font-style:italic;
+    padding:0 10px 4px 42px; margin-top:-4px;
+  }
   .alumni-file-badge{
     font-family:'IBM Plex Mono',monospace;
     font-size:10px;
@@ -804,32 +808,6 @@
     font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.04em;
     text-transform:uppercase; color:var(--ink-soft); margin:22px 0 10px;
   }
-
-  /* ---------- Arsip: tab bar untuk Timeline vs Daftar Kelas per Semester ---------- */
-  .arsip-tab-bar{
-    max-width:920px; margin:18px auto 0; padding:0 24px;
-    display:flex; gap:18px; flex-wrap:wrap;
-    border-bottom:1px solid var(--line);
-  }
-  .arsip-tab{
-    background:transparent;
-    border:none;
-    border-bottom:2px solid transparent;
-    padding:9px 2px 10px;
-    font-family:'Inter',sans-serif;
-    font-size:12.5px; font-weight:500;
-    color:var(--ink-soft);
-    cursor:pointer;
-    transition:all .15s;
-  }
-  .arsip-tab:hover{color:var(--teal);}
-  .arsip-tab.active{
-    background:transparent; color:var(--teal); border-bottom-color:var(--teal); font-weight:600;
-  }
-  .arsip-badge-yes{color:#2f6b3a; font-weight:600; font-size:12.5px;}
-  .arsip-badge-no{color:#a33; font-weight:600; font-size:12.5px;}
-  .arsip-link-yes a{color:var(--teal); text-decoration:none; font-size:12.5px;}
-  .arsip-link-yes a:hover{text-decoration:underline;}
 
   /* ---------- Form field umum: label/input/select/textarea (dipakai di semua modal) ---------- */
   .field > label{
@@ -960,6 +938,22 @@
     padding:16px 18px; white-space:pre-wrap; font-size:14px; line-height:1.7; color:var(--ink);
     max-height:65vh; overflow-y:auto;
   }
+  /* ---------- Progress bar upload file (TFS & folder statis) ---------- */
+  .upload-progress-filename{
+    font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-soft);
+    margin:10px 0 10px; word-break:break-all;
+  }
+  .upload-progress-track{
+    height:10px; border-radius:100px; background:var(--parchment-deep);
+    border:1px solid var(--line); overflow:hidden;
+  }
+  .upload-progress-fill{
+    height:100%; background:var(--teal); border-radius:100px;
+    transition:width .15s ease;
+  }
+  .upload-progress-label{
+    margin-top:8px; font-size:12.5px; color:var(--ink-soft); text-align:center;
+  }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -996,7 +990,6 @@
   <div class="hero-inner">
     <div class="eyebrow">Darush Shalihat</div>
     <h1 class="title">Arsip Kelas <em>&amp; Notulensi</em></h1>
-    <p class="desc">Kumpulan sesi kelas dan materi, disusun berdasarkan tanggal.</p>
     <div class="stat-row">
       <div class="stat"><b id="statTotal">0</b><span>sesi tercatat</span></div>
       <div class="stat"><b id="statNote">0</b><span>dengan notulensi</span></div>
@@ -1010,7 +1003,7 @@
 <div style="max-width:920px; margin:0 auto; padding:0 24px 28px;">
       <div class="alumni-materi-section">
         <div class="alumni-materi-header">
-          <p>Kumpulan materi kelas dari angkatan-angkatan alumni, disusun mengikuti struktur folder aslinya. Bisa tambah folder baru, tambah subfolder di dalamnya, dan unggah file PDF/Excel/PNG/Word ke folder mana pun.</p>
+          <p>Notulensi kelas dari berbagai angkatan DS. Bisa tambah folder baru, tambah subfolder di dalamnya, dan unggah file PDF/Excel/PNG/Word ke folder mana pun.</p>
           <div class="module-filter-row" id="angkatanFilterRow" style="margin-top:10px; align-items:center;">
             <select id="angkatanFilterSelect"></select>
             <button class="btn-admin-subtle" type="button" id="manageAngkatanBtn">⚙ Kelola</button>
@@ -1044,34 +1037,6 @@
       <button type="button" class="btn-admin-subtle" id="manageTopikBtn">⚙ Kelola Tag</button>
     </div>
     <div class="result-count"><span id="resultCount">0</span> sesi ditampilkan</div>
-  </div>
-</div>
-
-<div class="arsip-tab-bar" id="arsipTabBar">
-  <button type="button" class="arsip-tab active" data-arsip-tab="timeline">Timeline</button>
-  <button type="button" class="arsip-tab" data-arsip-tab="sem1">Daftar Kelas — Semester 1</button>
-  <button type="button" class="arsip-tab" data-arsip-tab="sem2">Daftar Kelas — Semester 2</button>
-  <button type="button" class="arsip-tab" data-arsip-tab="sem3">Daftar Kelas — Semester 3</button>
-  <button type="button" class="arsip-tab" data-arsip-tab="sem4">Daftar Kelas — Semester 4</button>
-</div>
-
-<div id="arsipTableView" style="display:none;">
-  <div class="module-table-wrap" style="margin:20px auto; max-width:1100px;">
-    <div id="arsipTableNote" style="padding:0 4px 12px; font-size:13px; color:var(--ink-soft);"></div>
-    <table class="module-table">
-      <thead>
-        <tr>
-          <th>No</th>
-          <th>Tanggal</th>
-          <th>Pemateri</th>
-          <th>Jenis</th>
-          <th>Judul</th>
-          <th>Notulensi</th>
-          <th>Link YouTube</th>
-        </tr>
-      </thead>
-      <tbody id="arsipTableBody"></tbody>
-    </table>
   </div>
 </div>
 
@@ -1227,6 +1192,17 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="uploadProgressModalOverlay">
+    <div class="modal-box" style="max-width:420px;">
+      <h3>Mengunggah File</h3>
+      <div id="uploadProgressFileName" class="upload-progress-filename"></div>
+      <div class="upload-progress-track">
+        <div class="upload-progress-fill" id="uploadProgressFill" style="width:0%;"></div>
+      </div>
+      <div id="uploadProgressLabel" class="upload-progress-label">Membaca file… 0%</div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="tfsTextModalOverlay">
     <div class="modal-box" style="max-width:560px;">
       <h3>Tambah Catatan Teks</h3>
@@ -1252,7 +1228,7 @@
       <div class="module-header">
         <div class="eyebrow">Darush Shalihat</div>
         <h1>Koneksi DS</h1>
-        <p>Daftar sosok yang bisa dihubungi untuk kebutuhan kelas — boleh alumni Darush Shalihat, boleh juga bukan. Catat nama, kontak, materi yang dikuasai, cara mengajarnya, dan riwayat dipanggil ke DS. Gunakan ini sebagai opsi pemateri saat merancang kelas.</p>
+        <p>Daftar koneksi yang bisa dihubungi untuk kebutuhan kelas,  boleh santri Darush Shalihat, boleh juga bukan. Gunakan informasi ini sebagai opsi pemateri saat merancang kelas.</p>
       </div>
 
       <div class="module-stats" id="pemateriStats">
@@ -1856,15 +1832,31 @@ function setJenisCheckboxGroup(groupEl, customInputEl, jenisString){
 // ---------- Lampiran notulensi (maks 5MB per file) ----------
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
 
-async function readFilesAsAttachments(fileList){
+async function readFilesAsAttachments(fileList, existingAttachments){
+  // Nama lampiran harus unik (dibandingkan dengan lampiran yang sudah ada di notulensi ini,
+  // maupun sesama file yang dipilih bareng di batch yang sama).
+  const existingNames = new Set((existingAttachments||[]).map(a => (a.nama||'').toLowerCase()));
+  const files = Array.from(fileList);
   const result = [];
-  for(const file of fileList){
-    if(file.size > MAX_ATTACHMENT_SIZE){
-      alert(`File "${file.name}" melebihi 5MB dan tidak diunggah.`);
-      continue;
+  try{
+    for(let i = 0; i < files.length; i++){
+      const file = files[i];
+      if(file.size > MAX_ATTACHMENT_SIZE){
+        alert(`File "${file.name}" melebihi 5MB dan tidak diunggah.`);
+        continue;
+      }
+      if(existingNames.has(file.name.toLowerCase())){
+        alert(`File "${file.name}" sudah ada di lampiran ini dan dilewati. Ganti nama filenya dulu kalau memang ingin mengunggah versi berbeda.`);
+        continue;
+      }
+      const label = files.length > 1 ? file.name + ' (' + (i+1) + '/' + files.length + ')' : file.name;
+      showUploadProgress(label);
+      const dataUrl = await fileToDataUrl(file, updateUploadProgress);
+      result.push({ id: Date.now()+Math.floor(Math.random()*1000), nama: file.name, dataUrl, type: file.type });
+      existingNames.add(file.name.toLowerCase());
     }
-    const dataUrl = await fileToDataUrl(file);
-    result.push({ id: Date.now()+Math.floor(Math.random()*1000), nama: file.name, dataUrl, type: file.type });
+  } finally {
+    hideUploadProgress();
   }
   return result;
 }
@@ -2506,7 +2498,7 @@ function buildEditForm(e){
   wrap.querySelector('.ef_save').addEventListener('click', async ()=>{
     const isoDate = wrap.querySelector('.ef_tanggal').value;
     const tanggal = isoDate ? fromISODate(isoDate) : e.tanggal;
-    const newAttachments = await readFilesAsAttachments(wrap.querySelector('.ef_attachment_new').files);
+    const newAttachments = await readFilesAsAttachments(wrap.querySelector('.ef_attachment_new').files, e.attachments);
 
     e.tanggal = tanggal;
     e.pembicara = wrap.querySelector('.ef_pembicara').value.trim() || 'Belum diketahui';
@@ -2602,7 +2594,10 @@ addForm.addEventListener('submit', async (ev)=>{
   const jenisGroup = document.getElementById('f_jenis_group');
   const jenisCustom = document.getElementById('f_jenis_custom');
   const attachmentInput = document.getElementById('f_attachment');
-  const newAttachments = await readFilesAsAttachments(attachmentInput.files);
+  const existingForDupeCheck = editingNotulensiId
+    ? (events.find(x=>x._id===editingNotulensiId)?.attachments || [])
+    : [];
+  const newAttachments = await readFilesAsAttachments(attachmentInput.files, existingForDupeCheck);
 
   if(!isoDate){
     alert('Tanggal wajib diisi.');
@@ -2784,13 +2779,36 @@ function tfsExt(name){
 }
 const TFS_ACCEPT = '.pdf,.xlsx,.png,.doc,.docx';
 const TFS_ACCEPT_REGEX = /\.(pdf|xlsx|png|doc|docx)$/i;
-function tfsFileToDataUrl(file){
+function tfsFileToDataUrl(file, onProgress){
   return new Promise((resolve, reject)=>{
     const reader = new FileReader();
     reader.onload = ()=> resolve(reader.result);
     reader.onerror = reject;
+    if(onProgress){
+      reader.onprogress = (e)=>{
+        if(e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+    }
     reader.readAsDataURL(file);
   });
+}
+// ---------- Progress bar upload file (dipakai bareng oleh TFS & folder statis DS 10/12/13) ----------
+function showUploadProgress(fileName){
+  document.getElementById('uploadProgressFileName').textContent = fileName;
+  document.getElementById('uploadProgressFill').style.width = '0%';
+  document.getElementById('uploadProgressLabel').textContent = 'Membaca file… 0%';
+  document.getElementById('uploadProgressModalOverlay').classList.add('open');
+}
+function updateUploadProgress(percent){
+  document.getElementById('uploadProgressFill').style.width = percent + '%';
+  document.getElementById('uploadProgressLabel').textContent = 'Membaca file… ' + percent + '%';
+}
+function setUploadProgressUploading(){
+  document.getElementById('uploadProgressFill').style.width = '100%';
+  document.getElementById('uploadProgressLabel').textContent = 'Mengunggah ke server…';
+}
+function hideUploadProgress(){
+  document.getElementById('uploadProgressModalOverlay').classList.remove('open');
 }
 function tfsFindNode(nodes, id){
   for(const n of (nodes||[])){
@@ -2857,6 +2875,7 @@ function tfsRenderNodes(nodes, treeKind, depth){
           '<a href="'+f.dataUrl+'" data-tfs-preview data-tfs-name="'+escapeHtmlAlumni(f.name)+'">' +
             '<span class="alumni-file-badge">'+tfsExt(f.name)+'</span>'+escapeHtmlAlumni(f.name) +
           '</a>' +
+          (f.description ? '<div class="tfs-file-description">'+escapeHtmlAlumni(f.description)+'</div>' : '') +
           '<button type="button" class="file-remove" data-tfs-tree="'+treeKind+'" data-tfs-delete="'+f.id+'">hapus</button>' +
         '</li>'
       ).join('') +
@@ -2926,15 +2945,35 @@ tfsFileInput.addEventListener('change', async () => {
     alert('File terlalu besar untuk disimpan di browser (maks. sekitar 4.5MB). Pertimbangkan kompres filenya dulu.');
     return;
   }
+  const tree = TFS_TREES[target.treeKind];
+  const root = tree.getRoot();
+  const folderNode = target.folderId ? tfsFindNode(root, target.folderId) : null;
+  const targetArray = folderNode ? (folderNode.children || (folderNode.children = [])) : root;
+  // Nama file harus unik di dalam folder yang sama -- cegah dua file dengan nama persis sama
+  // (perbandingan case-insensitive supaya "Materi.pdf" dan "materi.pdf" juga dianggap sama).
+  const nameExists = targetArray.some(n => n.type === 'file' && n.name.toLowerCase() === file.name.toLowerCase());
+  if(nameExists){
+    alert('Sudah ada file bernama "'+file.name+'" di folder ini. Ganti nama filenya dulu atau hapus file lama sebelum mengunggah ulang.');
+    return;
+  }
+  // Khusus di Project, tawarkan tambah deskripsi singkat untuk file ini -- sifatnya opsional,
+  // boleh dikosongkan/dibatalkan (Cancel/kosong = tidak ada deskripsi, tetap lanjut upload).
+  let description = '';
+  if(target.treeKind === 'project'){
+    const input = prompt('Deskripsi untuk file "'+file.name+'" (opsional, boleh dikosongkan):', '');
+    description = (input || '').trim();
+  }
   try{
-    const dataUrl = await tfsFileToDataUrl(file);
-    const tree = TFS_TREES[target.treeKind];
-    const root = tree.getRoot();
-    const folderNode = target.folderId ? tfsFindNode(root, target.folderId) : null;
-    const targetArray = folderNode ? (folderNode.children || (folderNode.children = [])) : root;
-    targetArray.push({ id: tfsNewId(), type:'file', name: file.name, dataUrl });
+    showUploadProgress(file.name);
+    const dataUrl = await tfsFileToDataUrl(file, updateUploadProgress);
+    setUploadProgressUploading();
+    const fileNode = { id: tfsNewId(), type:'file', name: file.name, dataUrl };
+    if(description) fileNode.description = description;
+    targetArray.push(fileNode);
     await tree.save();
+    hideUploadProgress();
   }catch(err){
+    hideUploadProgress();
     console.error('Gagal mengunggah file:', err);
     alert('Gagal mengunggah file. Coba lagi.');
   }
@@ -3468,11 +3507,16 @@ function renderStaticFolderUploads(){
   });
 }
 
-function fileToDataUrl(file){
+function fileToDataUrl(file, onProgress){
   return new Promise((resolve, reject)=>{
     const reader = new FileReader();
     reader.onload = ()=> resolve(reader.result);
     reader.onerror = reject;
+    if(onProgress){
+      reader.onprogress = (e)=>{
+        if(e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+    }
     reader.readAsDataURL(file);
   });
 }
@@ -3510,13 +3554,24 @@ fileUploadInput.addEventListener('change', async ()=>{
     alert('File terlalu besar untuk disimpan di browser (maks. sekitar 4.5MB). Pertimbangkan kompres filenya dulu.');
     return;
   }
+  // Nama file harus unik di dalam folder statis yang sama.
+  const existingFiles = alumniFolders[currentUploadTarget] || [];
+  const nameExists = existingFiles.some(f => f.nama.toLowerCase() === file.name.toLowerCase());
+  if(nameExists){
+    alert('Sudah ada file bernama "'+file.name+'" di folder ini. Ganti nama filenya dulu atau hapus file lama sebelum mengunggah ulang.');
+    return;
+  }
   try{
-    const dataUrl = await fileToDataUrl(file);
+    showUploadProgress(file.name);
+    const dataUrl = await fileToDataUrl(file, updateUploadProgress);
+    setUploadProgressUploading();
     if(!alumniFolders[currentUploadTarget]) alumniFolders[currentUploadTarget] = [];
     alumniFolders[currentUploadTarget].push({ nama: file.name, dataUrl, type: file.type, size: file.size });
     await saveAlumniFolders();
     refreshFolderView();
+    hideUploadProgress();
   }catch(err){
+    hideUploadProgress();
     console.error('Gagal mengunggah file:', err);
     alert('Gagal mengunggah file. Coba lagi.');
   }
@@ -3618,11 +3673,10 @@ function applyAngkatanFilterToFolders(){
 document.getElementById('angkatanFilterSelect').addEventListener('change', (e)=>{
   activeAngkatanFilter = e.target.value;
   buildAngkatanFilter();
-  // Pilihan angkatan yang sama juga langsung menyaring timeline notulensi di bawahnya,
+  // Pilihan angkatan yang sama juga langsung menyaring daftar notulensi di bawahnya,
   // supaya pilih "DS 14" di sini otomatis cuma nampilin catatan DS 14 juga.
   activeAngkatanNotulensi = activeAngkatanFilter || null;
   refreshFilters(); // jenis/topik/pemateri dibangun ulang khusus utk angkatan yg dipilih
-  updateArsipTabBarForAngkatan();
   resetPagination();
   render();
 });
@@ -3736,103 +3790,6 @@ document.getElementById('addSopBtn').addEventListener('click', addNewTauri);
   renderTauriTreePage();
 })();
 /* ============================= /MODUL: TAURIS ============================= */
-</script>
-
-<script>
-/* ============================= MODUL BARU: TAB ARSIP (Daftar Kelas per Semester + Belum Ada Notulensi) ============================= */
-// Rentang semester (perkiraan untuk sem 3 & 4, silakan sesuaikan kalau tanggal pastinya berbeda).
-const SEMESTER_RANGES = {
-  sem1: { label: 'Semester 1 — 1 Juni 2025 s.d. 10 Februari 2026', start: new Date(2025,5,1), end: new Date(2026,1,10,23,59,59) },
-  sem2: { label: 'Semester 2 — 11 Februari 2026 s.d. Juli 2026', start: new Date(2026,1,11), end: new Date(2026,6,31,23,59,59) },
-  sem3: { label: 'Semester 3 — Agustus 2026 s.d. sekitar Desember 2026 (perkiraan)', start: new Date(2026,7,1), end: new Date(2026,11,31,23,59,59) },
-  sem4: { label: 'Semester 4 — Januari 2027 s.d. sekitar Juni 2027 (perkiraan)', start: new Date(2027,0,1), end: new Date(2027,5,30,23,59,59) },
-};
-
-// Tab "Timeline" dan "Daftar Kelas per Semester" itu dirancang khusus utk rentang tanggal DS 14.
-// Untuk angkatan lain (DS 13, dst) tab-tab itu disembunyikan -- yang tersisa cukup daftar kartu
-// notulensi biasa (sudah tersaring sesuai angkatan yg dipilih lewat chip di atas).
-function updateArsipTabBarForAngkatan(){
-  const isDS14orAll = !activeAngkatanNotulensi || activeAngkatanNotulensi === 'DS 14';
-  const tabsToHide = ['timeline','sem1','sem2','sem3','sem4'];
-  document.querySelectorAll('#arsipTabBar .arsip-tab').forEach(btn=>{
-    const key = btn.dataset.arsipTab;
-    if(tabsToHide.includes(key)) btn.style.display = isDS14orAll ? '' : 'none';
-  });
-  if(!isDS14orAll){
-    document.querySelectorAll('#arsipTabBar .arsip-tab').forEach(b=>b.classList.remove('active'));
-    document.getElementById('arsipControlsWrap').style.display = '';
-    document.getElementById('main').style.display = '';
-    document.getElementById('loadMoreWrap').style.display = '';
-    document.getElementById('arsipTableView').style.display = 'none';
-  } else {
-    const activeTab = document.querySelector('#arsipTabBar .arsip-tab.active');
-    if(!activeTab){
-      const timelineBtn = document.querySelector('[data-arsip-tab="timeline"]');
-      if(timelineBtn) timelineBtn.classList.add('active');
-    }
-  }
-}
-
-function escapeHtmlArsip(s){
-  return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function renderArsipTable(mode){
-  const tbody = document.getElementById('arsipTableBody');
-  const note = document.getElementById('arsipTableNote');
-  let list = events.slice().sort((a,b)=>a._date-b._date);
-
-  if(mode==='missing'){
-    list = list.filter(e=> !(e.catatan && e.catatan.trim()) || !(e.link_yt && e.link_yt.trim()));
-    note.textContent = `Menampilkan sesi yang belum ada catatan notulensi dan/atau belum ada link YouTube. Total: ${list.length} sesi.`;
-  } else {
-    const range = SEMESTER_RANGES[mode];
-    list = list.filter(e=> e._date >= range.start && e._date <= range.end);
-    note.textContent = `${range.label}. Total: ${list.length} sesi.`;
-  }
-
-  if(list.length===0){
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="7"><span class="glyph">۝</span>Tidak ada data untuk tampilan ini.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = list.map((e,i)=>{
-    const hasNote = e.catatan && e.catatan.trim();
-    const hasLink = e.link_yt && e.link_yt.trim();
-    return `<tr>
-      <td>${i+1}</td>
-      <td>${e.tanggal}</td>
-      <td>${escapeHtmlArsip(e.pembicara)}</td>
-      <td>${escapeHtmlArsip(e.jenis)||'-'}</td>
-      <td>${escapeHtmlArsip(e.judul)||'<span style="color:var(--ink-soft);font-style:italic;">(belum ada judul)</span>'}</td>
-      <td>${hasNote ? '<span class="arsip-badge-yes">✓ Ada</span>' : '<span class="arsip-badge-no">✕ Belum ada</span>'}</td>
-      <td>${hasLink ? `<span class="arsip-link-yes"><a href="${e.link_yt}" target="_blank" rel="noopener">▶ Buka</a></span>` : '<span class="arsip-badge-no">✕ Belum ada</span>'}</td>
-    </tr>`;
-  }).join('');
-}
-
-document.getElementById('arsipTabBar').addEventListener('click', (e)=>{
-  const btn = e.target.closest('.arsip-tab');
-  if(!btn) return;
-  document.querySelectorAll('#arsipTabBar .arsip-tab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  const tab = btn.dataset.arsipTab;
-
-  const timelineEls = [document.getElementById('arsipControlsWrap'), document.getElementById('main'), document.getElementById('loadMoreWrap')];
-  const tableView = document.getElementById('arsipTableView');
-
-  if(tab==='timeline'){
-    timelineEls.forEach(el=> el.style.display='');
-    tableView.style.display='none';
-    updateLoadMoreButton(events.length); // biar tombol muncul/hilang sesuai kondisi normal
-    render();
-  } else {
-    timelineEls.forEach(el=> el.style.display='none');
-    tableView.style.display='';
-    renderArsipTable(tab);
-  }
-});
-/* ============================= /MODUL BARU: TAB ARSIP ============================= */
 </script>
 </body>
 </html>
