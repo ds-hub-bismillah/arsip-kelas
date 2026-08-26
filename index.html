@@ -331,6 +331,9 @@
     margin:6px 0 4px;
   }
   .catatan-preview.expanded{max-height:none;}
+  .catatan-preview.expanded ul, .catatan-preview.expanded ol{margin:6px 0 6px 22px; padding:0;}
+  .catatan-preview.expanded b, .catatan-preview.expanded strong{font-weight:700;}
+  .catatan-preview.expanded i, .catatan-preview.expanded em{font-style:italic;}
   .catatan-preview:not(.expanded)::after{
     content:"";
     position:absolute; left:0; right:0; bottom:0; height:1.6em;
@@ -382,6 +385,63 @@
     align-items:flex-start;
     min-height:100vh;
   }
+
+  /* ---------- Login overlay ---------- */
+  .login-overlay{
+    position:fixed; inset:0; z-index:5000;
+    background:var(--teal);
+    display:flex; align-items:center; justify-content:center;
+    padding:20px;
+  }
+  .login-overlay.hidden{display:none;}
+  .login-box{
+    background:var(--parchment);
+    border-radius:14px;
+    padding:36px 32px;
+    width:100%; max-width:340px;
+    box-shadow:0 20px 60px rgba(0,0,0,.35);
+    text-align:center;
+  }
+  .login-brand{
+    font-family:'Amiri',serif; font-weight:700; font-size:17px;
+    color:var(--teal); margin-bottom:6px;
+  }
+  .login-brand em{font-style:italic; color:var(--brass);}
+  .login-box h1{
+    font-family:'Amiri',serif; font-size:24px; color:var(--ink); margin:0 0 6px;
+  }
+  .login-sub{font-size:12.5px; color:var(--ink-soft); margin:0 0 20px;}
+  .login-box input[type="password"]{
+    width:100%; box-sizing:border-box;
+    padding:11px 14px; border:1px solid var(--line); border-radius:8px;
+    font-family:'Inter',sans-serif; font-size:14px;
+    outline:none; margin-bottom:10px; text-align:center;
+  }
+  .login-box input[type="password"]:focus{border-color:var(--brass);}
+  .login-error{
+    color:#B5533C; font-size:12.5px; min-height:16px; margin-bottom:10px;
+  }
+  .login-box .btn-add{width:100%; justify-content:center;}
+
+  /* ---------- Sidebar: badge role + tombol akun ---------- */
+  .sidebar-account{
+    margin-top:auto; padding-top:16px; border-top:1px solid rgba(255,255,255,.12);
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .sidebar-role-badge{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.05em;
+    text-transform:uppercase; color:#9FB0A8; padding:2px 10px 6px;
+  }
+  .sidebar-account-btn{
+    background:transparent; border:1px solid rgba(255,255,255,.18); border-radius:8px;
+    color:#EFE9D6; font-family:'Inter',sans-serif; font-size:12px;
+    padding:8px 10px; text-align:left; cursor:pointer; transition:background .15s;
+  }
+  .sidebar-account-btn:hover{background:rgba(255,255,255,.08);}
+
+  /* ---------- Mode viewer: sembunyikan semua elemen aksi tulis (tandai class "edit-only") ---------- */
+  .role-viewer .edit-only{display:none !important;}
+
   .sidebar{
     flex:0 0 232px;
     width:232px;
@@ -828,12 +888,41 @@
   .field input:focus, .field select:focus, .field textarea:focus{border-color:var(--brass);}
   .field textarea{resize:vertical; line-height:1.6; min-height:90px;}
 
-  /* Catatan/notulensi butuh ruang jauh lebih besar supaya nyaman menulis panjang, seperti Word */
-  #f_catatan, .ef_catatan{
+  /* ---------- Catatan/notulensi: toolbar + editor rich-text (bold/italic/list) ----------
+     Catatan butuh ruang jauh lebih besar supaya nyaman menulis panjang, seperti Word. */
+  .richtext-toolbar{
+    display:flex; gap:4px; margin-bottom:6px;
+  }
+  .richtext-btn{
+    min-width:34px; padding:5px 10px;
+    border:1px solid var(--line); border-radius:6px;
+    background:var(--card); color:var(--ink);
+    font-family:'Inter',sans-serif; font-size:12.5px;
+    cursor:pointer; transition:all .15s;
+  }
+  .richtext-btn:hover{border-color:var(--brass-soft); background:var(--parchment-deep);}
+  .richtext-editor{
     min-height:380px !important;
     font-size:14.5px;
     line-height:1.75;
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    outline:none;
+    overflow-y:auto;
   }
+  .richtext-editor:focus{border-color:var(--brass);}
+  .richtext-editor:empty::before{
+    content:attr(data-placeholder);
+    color:var(--ink-soft);
+    pointer-events:none;
+  }
+  .richtext-editor ul, .richtext-editor ol{margin:6px 0 6px 22px; padding:0;}
+  .richtext-editor b, .richtext-editor strong{font-weight:700;}
+  .richtext-editor i, .richtext-editor em{font-style:italic;}
 
   /* ---------- Jenis kelas: checkbox multi-select ---------- */
   .jenis-checkbox-group{
@@ -959,7 +1048,18 @@
 </head>
 <body>
 
-<div class="app-shell">
+<div class="login-overlay" id="loginOverlay">
+  <form class="login-box" id="loginForm">
+    <div class="login-brand">Darush <em>Shalihat</em></div>
+    <h1>Arsip Kelas</h1>
+    <p class="login-sub">Masukkan password untuk membuka arsip.</p>
+    <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required autofocus>
+    <div class="login-error" id="loginError"></div>
+    <button type="submit" class="btn-add" id="loginSubmitBtn">Masuk</button>
+  </form>
+</div>
+
+<div class="app-shell" id="appShellRoot" style="visibility:hidden;">
   <nav class="sidebar">
     <div class="sidebar-brand">Darush <em>Shalihat</em></div>
     <div class="sidebar-section-label">Menu</div>
@@ -980,6 +1080,11 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span>Koneksi DS</span>
       </button>
+    </div>
+    <div class="sidebar-account">
+      <div class="sidebar-role-badge" id="sidebarRoleBadge"></div>
+      <button type="button" class="sidebar-account-btn edit-only" id="changeViewerPasswordBtn">🔑 Ganti Password Viewer</button>
+      <button type="button" class="sidebar-account-btn" id="logoutBtn">↩ Keluar</button>
     </div>
   </nav>
 
@@ -1006,9 +1111,9 @@
           <p>Notulensi kelas dari berbagai angkatan DS. Bisa tambah folder baru, tambah subfolder di dalamnya, dan unggah file PDF/Excel/PNG/Word ke folder mana pun.</p>
           <div class="module-filter-row" id="angkatanFilterRow" style="margin-top:10px; align-items:center;">
             <select id="angkatanFilterSelect"></select>
-            <button class="btn-admin-subtle" type="button" id="manageAngkatanBtn">⚙ Kelola</button>
+            <button class="btn-admin-subtle edit-only" type="button" id="manageAngkatanBtn">⚙ Kelola</button>
           </div>
-          <div style="display:flex; gap:8px; margin-top:10px;">
+          <div style="display:flex; gap:8px; margin-top:10px;" class="edit-only">
             <button class="btn-ghost" type="button" id="addFolderBtn">+ Tambah Folder</button>
           </div>
         </div>
@@ -1029,12 +1134,12 @@
         <input id="searchInput" type="text" placeholder="Cari judul, tema, atau isi catatan…">
       </div>
       <select id="pembicaraSelect"></select>
-      <button id="addNotulensiBtn" class="btn-add" type="button">+ Notulensi</button>
+      <button id="addNotulensiBtn" class="btn-add edit-only" type="button">+ Notulensi</button>
     </div>
     <div class="filter-dropdown-row">
       <select id="jenisFilterSelect"><option value="">Semua Jenis Kelas</option></select>
       <select id="topikFilterSelect"><option value="">Semua Topik Materi</option></select>
-      <button type="button" class="btn-admin-subtle" id="manageTopikBtn">⚙ Kelola Tag</button>
+      <button type="button" class="btn-admin-subtle edit-only" id="manageTopikBtn">⚙ Kelola Tag</button>
     </div>
     <div class="result-count"><span id="resultCount">0</span> sesi ditampilkan</div>
   </div>
@@ -1098,7 +1203,13 @@
       </div>
       <div class="field" style="margin-top:10px;">
         <label for="f_catatan">Catatan / Notulensi</label>
-        <textarea id="f_catatan" placeholder="Tulis notulensi di sini... (tidak ada batas panjang, tulis selengkap yang dibutuhkan)"></textarea>
+        <div class="richtext-toolbar" data-richtext-toolbar="f_catatan">
+          <button type="button" class="richtext-btn" data-cmd="bold" title="Tebal"><b>B</b></button>
+          <button type="button" class="richtext-btn" data-cmd="italic" title="Miring"><i>I</i></button>
+          <button type="button" class="richtext-btn" data-cmd="insertUnorderedList" title="Daftar bullet">• List</button>
+          <button type="button" class="richtext-btn" data-cmd="insertOrderedList" title="Daftar bernomor">1. List</button>
+        </div>
+        <div id="f_catatan" class="richtext-editor" contenteditable="true" data-placeholder="Tulis notulensi di sini... (tidak ada batas panjang, tulis selengkap yang dibutuhkan; boleh copy-paste dari Word/Google Docs — bullet, nomor, tebal, dan miring akan ikut terbawa)"></div>
       </div>
       <div class="field" style="margin-top:10px;">
         <label for="f_ketidakhadiran">Ketidakhadiran</label>
@@ -1154,7 +1265,7 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5B5342" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
           <input type="text" id="tauriSearch" placeholder="Cari nama folder atau file Tauris…">
         </div>
-        <button class="btn-add" type="button" id="addSopBtn">+ Tauris Baru</button>
+        <button class="btn-add edit-only" type="button" id="addSopBtn">+ Tauris Baru</button>
       </div>
 
       <div class="alumni-folder-tree" id="tauriTreeContainer"></div>
@@ -1174,7 +1285,7 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5B5342" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
           <input type="text" id="projectSearch" placeholder="Cari nama folder atau file Project…">
         </div>
-        <button class="btn-add" type="button" id="projectAddBtn">+ Project Baru</button>
+        <button class="btn-add edit-only" type="button" id="projectAddBtn">+ Project Baru</button>
       </div>
 
       <div class="alumni-folder-tree" id="projectTreeContainer"></div>
@@ -1189,6 +1300,24 @@
         <button type="button" class="btn-cancel" id="tfsPreviewCloseBtn">Tutup</button>
         <a class="btn-save" id="tfsPreviewDownloadBtn" download>⬇ Download</a>
       </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="changeViewerPasswordOverlay">
+    <div class="modal-box" style="max-width:420px;">
+      <h3>Ganti Password Viewer</h3>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-6px;">Password baru ini akan langsung berlaku untuk siapapun yang login sebagai viewer setelahnya. Bagikan password baru ini ke orang yang perlu akses lihat-saja.</p>
+      <form id="changeViewerPasswordForm">
+        <div class="field">
+          <label for="newViewerPasswordInput">Password Baru untuk Viewer</label>
+          <input type="text" id="newViewerPasswordInput" placeholder="Minimal 8 karakter" required minlength="8">
+        </div>
+        <div class="login-error" id="changeViewerPasswordError"></div>
+        <div class="form-actions" style="margin-top:16px;">
+          <button type="button" class="btn-cancel" id="changeViewerPasswordCancelBtn">Batal</button>
+          <button type="submit" class="btn-save" id="changeViewerPasswordSubmitBtn">Simpan Password Baru</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -1240,7 +1369,7 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5B5342" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
           <input type="text" id="pemateriSearch" placeholder="Cari nama, angkatan, atau materi…">
         </div>
-        <button class="btn-add" type="button" id="addPemateriBtn">+ Tambah Koneksi</button>
+        <button class="btn-add edit-only" type="button" id="addPemateriBtn">+ Tambah Koneksi</button>
       </div>
 
       <div class="module-table-wrap">
@@ -1272,6 +1401,148 @@
 
   </div><!-- /.content-area -->
 </div><!-- /.app-shell -->
+
+<script>
+/* =============================================================================
+   GERBANG LOGIN (auth gate) — HARUS jadi script PERTAMA yang jalan, sebelum
+   semua modul lain (Arsip Kelas, Project, Tauris, Koneksi DS) mulai memuat
+   data dari Supabase. Login cuma pakai SATU kotak password (tanpa username):
+   - Password editor -> masuk sebagai editor (akses tulis penuh)
+   - Password viewer -> masuk sebagai viewer (lihat-saja)
+   Sesi disimpan otomatis oleh supabase-js di localStorage, jadi tidak perlu
+   login ulang tiap buka halaman selama sesi belum expired/logout.
+   ============================================================================= */
+const AUTH_SUPABASE_URL = 'https://tuoakxfasrgwyxdhgapk.supabase.co';
+const AUTH_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1b2FreGZhc3Jnd3l4ZGhnYXBrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyNjYzNzcsImV4cCI6MjEwMTg0MjM3N30.gi-0VMO2Jp6B4Usrj7sYOr_hkojnfW2AMgKxcuL34LU';
+const EDITOR_EMAIL = 'editor@arsip-ds.internal';
+const VIEWER_EMAIL = 'viewer@arsip-ds.internal';
+
+window.authClient = (typeof supabase !== 'undefined')
+  ? supabase.createClient(AUTH_SUPABASE_URL, AUTH_SUPABASE_ANON_KEY)
+  : null;
+
+function applyAuthRole(role){
+  document.body.classList.remove('role-viewer', 'role-editor');
+  document.body.classList.add(role === 'editor' ? 'role-editor' : 'role-viewer');
+  const badge = document.getElementById('sidebarRoleBadge');
+  if(badge) badge.textContent = role === 'editor' ? 'Mode: Editor' : 'Mode: Lihat saja';
+  document.getElementById('loginOverlay').classList.add('hidden');
+  document.getElementById('appShellRoot').style.visibility = 'visible';
+}
+
+(async function authGate(){
+  if(!window.authClient){
+    document.getElementById('loginError').textContent = 'Gagal memuat pustaka Supabase. Periksa koneksi internet lalu muat ulang halaman.';
+    return;
+  }
+  try{
+    const { data: { session } } = await window.authClient.auth.getSession();
+    const role = session?.user?.user_metadata?.role;
+    if(session && role){
+      // Sesi lama masih berlaku (dari kunjungan sebelumnya) -- langsung masuk tanpa perlu
+      // login ulang. Skrip-skrip modul lain di bawah ini belum sempat memuat data apa pun
+      // (baru mulai jalan setelah script ini selesai), jadi mereka akan otomatis memakai
+      // sesi yang sudah aktif ini.
+      applyAuthRole(role);
+    }
+  }catch(err){
+    console.error('Gagal memeriksa sesi login:', err);
+  }
+})();
+
+document.getElementById('loginForm').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginSubmitBtn');
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Memeriksa…';
+  try{
+    // Coba sebagai editor dulu; kalau password tidak cocok, coba sebagai viewer. Dengan cara
+    // ini pengguna cukup ingat SATU password (nggak perlu tau/pilih dia editor atau viewer).
+    let { data, error } = await window.authClient.auth.signInWithPassword({ email: EDITOR_EMAIL, password });
+    if(error){
+      ({ data, error } = await window.authClient.auth.signInWithPassword({ email: VIEWER_EMAIL, password }));
+    }
+    if(error || !data.session){
+      errEl.textContent = 'Password salah. Coba lagi.';
+      btn.disabled = false;
+      btn.textContent = 'Masuk';
+      return;
+    }
+    // Reload bersih supaya SEMUA modul (Arsip Kelas, Project, Tauris, Koneksi DS) memuat
+    // data dengan sesi yang sudah aktif ini sejak awal, bukan mencoba menyusul di tengah jalan.
+    location.reload();
+  }catch(err){
+    console.error('Gagal login:', err);
+    errEl.textContent = 'Terjadi kesalahan. Coba lagi.';
+    btn.disabled = false;
+    btn.textContent = 'Masuk';
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+  if(!confirm('Keluar dari sesi ini?')) return;
+  await window.authClient.auth.signOut();
+  location.reload();
+});
+
+// ---------- Ganti Password Viewer (khusus editor) ----------
+document.getElementById('changeViewerPasswordBtn').addEventListener('click', ()=>{
+  document.getElementById('newViewerPasswordInput').value = '';
+  document.getElementById('changeViewerPasswordError').textContent = '';
+  document.getElementById('changeViewerPasswordOverlay').classList.add('open');
+});
+document.getElementById('changeViewerPasswordCancelBtn').addEventListener('click', ()=>{
+  document.getElementById('changeViewerPasswordOverlay').classList.remove('open');
+});
+document.getElementById('changeViewerPasswordOverlay').addEventListener('click', (ev)=>{
+  if(ev.target.id === 'changeViewerPasswordOverlay') ev.target.classList.remove('open');
+});
+document.getElementById('changeViewerPasswordForm').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const newPassword = document.getElementById('newViewerPasswordInput').value;
+  const errEl = document.getElementById('changeViewerPasswordError');
+  const btn = document.getElementById('changeViewerPasswordSubmitBtn');
+  errEl.textContent = '';
+  if(newPassword.length < 8){
+    errEl.textContent = 'Password baru minimal 8 karakter.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan…';
+  try{
+    const { data: { session } } = await window.authClient.auth.getSession();
+    if(!session){
+      errEl.textContent = 'Sesi login tidak ditemukan. Silakan login ulang.';
+      btn.disabled = false; btn.textContent = 'Simpan Password Baru';
+      return;
+    }
+    const res = await fetch(AUTH_SUPABASE_URL + '/functions/v1/change-viewer-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + session.access_token,
+      },
+      body: JSON.stringify({ newPassword }),
+    });
+    const result = await res.json().catch(()=>({}));
+    if(!res.ok){
+      errEl.textContent = result.error || 'Gagal menyimpan password baru.';
+      btn.disabled = false; btn.textContent = 'Simpan Password Baru';
+      return;
+    }
+    alert('Password viewer berhasil diganti. Bagikan password baru ini ke orang yang perlu akses lihat-saja.');
+    document.getElementById('changeViewerPasswordOverlay').classList.remove('open');
+  }catch(err){
+    console.error('Gagal ganti password viewer:', err);
+    errEl.textContent = 'Terjadi kesalahan. Coba lagi.';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Simpan Password Baru';
+});
+</script>
 
 <script>
 // ---------- Sidebar navigation ----------
@@ -1539,7 +1810,8 @@ function showOfflineBanner(){
 // dimuat/ditambah/diedit), bukan setiap kali render()/pencarian dipanggil,
 // supaya proses pencarian tidak perlu join+toLowerCase ulang setiap keystroke.
 function buildSearchIndex(e){
-  return `${e.judul||''} ${e.tema||''} ${e.catatan||''} ${e.pembicara||''} ${e.jenis||''} ${e.topik||''} ${e.ketidakhadiran||''}`.toLowerCase();
+  const catatanPlain = e.catatan ? stripImageMarkers(e.catatan) : '';
+  return `${e.judul||''} ${e.tema||''} ${catatanPlain} ${e.pembicara||''} ${e.jenis||''} ${e.topik||''} ${e.ketidakhadiran||''}`.toLowerCase();
 }
 
 // Menyimpan SEMUA event ke Supabase sekaligus -- dipakai HANYA untuk operasi massal
@@ -1872,7 +2144,7 @@ function attachmentListHTML(attachments){
       <span class="attachment-actions">
         ${viewLink}
         <a href="${a.dataUrl}" download="${escapeHtmlFull(a.nama)}">⬇ Unduh</a>
-        <button type="button" class="file-remove" data-remove-attachment="${a.id}">hapus</button>
+        <button type="button" class="file-remove edit-only" data-remove-attachment="${a.id}">hapus</button>
       </span>
     </li>`;
   }).join('');
@@ -1885,8 +2157,8 @@ function renderCommentNode(c, allComments, eventId){
     <div class="comment-body">${escapeHtmlFull(c.text)}</div>
     <div class="comment-meta">
       <span>${escapeHtmlFull(c.date||'')}</span>
-      <button type="button" class="comment-reply-btn" data-reply-to="${c.id}">Balas</button>
-      <button type="button" class="comment-delete" data-delete-comment="${c.id}">Hapus</button>
+      <button type="button" class="comment-reply-btn edit-only" data-reply-to="${c.id}">Balas</button>
+      <button type="button" class="comment-delete edit-only" data-delete-comment="${c.id}">Hapus</button>
     </div>
     <div class="comment-reply-form" data-reply-form-for="${c.id}" style="display:none;"></div>
     ${replies.length ? `<ul class="comment-replies">${replies.map(r=>renderCommentNode(r, allComments, eventId)).join('')}</ul>` : ''}
@@ -1902,7 +2174,7 @@ function renderCommentsPanel(eventId){
     ? `<ul class="comment-thread">${topLevel.map(c=>renderCommentNode(c, list, eventId)).join('')}</ul>`
     : '<div class="comment-empty">Belum ada komentar. Jadilah yang pertama menulis catatan/tanggapan.</div>';
   return `${threadHtml}
-    <div class="comment-new-box">
+    <div class="comment-new-box edit-only">
       <textarea placeholder="Tulis komentar atau catatan tambahan..."></textarea>
       <div class="comment-form-actions">
         <button type="button" class="btn-save comment-submit-new">Kirim Komentar</button>
@@ -1939,7 +2211,54 @@ function deleteCommentCascade(e, commentId){
   e.komentar = e.komentar.filter(c => !toDelete.has(c.id));
 }
 
+// Mendeteksi apakah catatan sudah berbentuk HTML kaya (hasil rich-text editor: bold, italic,
+// bullet/nomor) atau masih teks polos lama (mungkin berisi marker [[IMG:..]]) -- supaya catatan
+// lama yang sudah ada tetap tampil benar tanpa perlu dimigrasi satu-satu.
+function looksLikeRichHTML(text){
+  return /<\/?(p|div|ul|ol|li|b|strong|i|em|u|br|span|img)[^>]*>/i.test(text);
+}
+
+// Tag yang diizinkan pada catatan rich-text. Tag lain di luar daftar ini di-"unwrap" (isinya
+// dipertahankan, tag pembungkusnya dibuang) supaya paste dari Word/Google Docs tidak ikut
+// membawa <script>, <style>, atau elemen aneh lain -- termasuk membuang SEMUA atribut
+// (termasuk inline style bawaan Word) kecuali src/alt pada <img>.
+const RICHTEXT_ALLOWED_TAGS = new Set(['B','STRONG','I','EM','U','UL','OL','LI','BR','P','DIV','SPAN','IMG']);
+function sanitizeNotulensiHTML(html){
+  const container = document.createElement('div');
+  container.innerHTML = html || '';
+  (function cleanNode(node){
+    Array.from(node.childNodes).forEach(child=>{
+      if(child.nodeType === Node.TEXT_NODE) return;
+      if(child.nodeType !== Node.ELEMENT_NODE){ node.removeChild(child); return; }
+      cleanNode(child); // bersihkan anak-anaknya dulu (post-order) sebelum unwrap/keep dirinya
+      if(!RICHTEXT_ALLOWED_TAGS.has(child.tagName)){
+        while(child.firstChild) node.insertBefore(child.firstChild, child);
+        node.removeChild(child);
+        return;
+      }
+      if(child.tagName === 'IMG'){
+        const src = child.getAttribute('src') || '';
+        const safeSrc = /^(https?:|data:image\/)/i.test(src) ? src : '';
+        Array.from(child.attributes).forEach(attr => child.removeAttribute(attr.name));
+        if(safeSrc) child.setAttribute('src', safeSrc);
+        else { node.removeChild(child); return; }
+      } else {
+        Array.from(child.attributes).forEach(attr => child.removeAttribute(attr.name));
+      }
+    });
+  })(container);
+  return container.innerHTML;
+}
+
 function stripImageMarkers(text){
+  // Catatan bisa berupa teks polos lama (dengan marker [[IMG:..]]) ATAU html kaya (hasil
+  // rich-text editor) -- fungsi ini menghasilkan versi TEKS POLOS TANPA TAG, dipakai untuk
+  // cuplikan kartu (sebelum "Baca notulensi lengkap") dan index pencarian.
+  if(looksLikeRichHTML(text)){
+    const div = document.createElement('div');
+    div.innerHTML = sanitizeNotulensiHTML(text);
+    return (div.textContent || '').replace(/\n{3,}/g, '\n\n');
+  }
   return text.replace(/\[\[IMG:[^\]]+\]\]/g, '').replace(/\n{3,}/g, '\n\n');
 }
 
@@ -1947,11 +2266,13 @@ function escapeHtmlFull(text){
   return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// Mengubah teks catatan (yang bisa berisi marker [[IMG:path]]) menjadi HTML
-// aman: seluruh teks di-escape, lalu marker gambar diganti menjadi elemen
-// <img> yang menampilkan gambar hasil scan/screenshot notulensi.
+// Mengubah catatan (HTML kaya hasil rich-text editor, ATAU teks polos lama dengan marker
+// [[IMG:path]]) menjadi HTML aman untuk ditampilkan.
 function renderNoteHTML(text){
   if(!text) return '';
+  if(looksLikeRichHTML(text)){
+    return sanitizeNotulensiHTML(text);
+  }
   const parts = text.split(/(\[\[IMG:[^\]]+\]\])/g);
   return parts.map(part=>{
     const m = part.match(/^\[\[IMG:([^\]]+)\]\]$/);
@@ -1962,6 +2283,40 @@ function renderNoteHTML(text){
     return escapeHtmlFull(part);
   }).join('');
 }
+
+// ---------- Toolbar rich-text (Bold/Italic/Bullet/Nomor) untuk field Catatan/Notulensi ----------
+// Dipakai delegasi supaya bekerja baik untuk toolbar statis di modal tambah/edit (#f_catatan)
+// maupun toolbar yang baru dibuat setiap kali kartu notulensi dibuka mode edit-inline (.ef_catatan).
+document.addEventListener('click', (ev)=>{
+  const btn = ev.target.closest('.richtext-btn');
+  if(!btn) return;
+  ev.preventDefault();
+  const toolbar = btn.closest('.richtext-toolbar');
+  const editor = toolbar.dataset.richtextToolbar
+    ? document.getElementById(toolbar.dataset.richtextToolbar)
+    : toolbar.nextElementSibling;
+  if(!editor) return;
+  editor.focus();
+  document.execCommand(btn.dataset.cmd, false, null);
+});
+
+// Saat paste ke editor catatan, ambil versi HTML dari clipboard (kalau ada -- ini yang bawa
+// info bold/italic/bullet/nomor dari Word/Google Docs), bersihkan lewat sanitizeNotulensiHTML
+// (buang inline style/class bawaan Word yang berantakan), baru disisipkan. Kalau clipboard cuma
+// punya teks polos, sisipkan sebagai teks biasa.
+document.addEventListener('paste', (ev)=>{
+  const editor = ev.target.closest('.richtext-editor');
+  if(!editor) return;
+  ev.preventDefault();
+  const clipboard = ev.clipboardData || window.clipboardData;
+  const html = clipboard ? clipboard.getData('text/html') : '';
+  if(html){
+    document.execCommand('insertHTML', false, sanitizeNotulensiHTML(html));
+  } else {
+    const text = clipboard ? clipboard.getData('text/plain') : '';
+    document.execCommand('insertText', false, text);
+  }
+});
 
 function highlightSnippet(text, q){
   if(!text) return '';
@@ -2096,7 +2451,7 @@ function buildCardInnerHTML(e, q){
         <div class="link-row">
           ${e.link_yt ? `<a class="link-btn" href="${e.link_yt}" target="_blank" rel="noopener">▶ YouTube</a>` : ''}
         </div>
-        <div class="event-actions">
+        <div class="event-actions edit-only">
           <button class="icon-btn edit-btn">✎ Edit</button>
           <button class="icon-btn danger delete-btn">🗑 Hapus</button>
         </div>
@@ -2461,7 +2816,13 @@ function buildEditForm(e){
     </div>
     <div class="field">
       <label>Catatan / Notulensi</label>
-      <textarea class="ef_catatan"></textarea>
+      <div class="richtext-toolbar" data-richtext-toolbar-inline>
+        <button type="button" class="richtext-btn" data-cmd="bold" title="Tebal"><b>B</b></button>
+        <button type="button" class="richtext-btn" data-cmd="italic" title="Miring"><i>I</i></button>
+        <button type="button" class="richtext-btn" data-cmd="insertUnorderedList" title="Daftar bullet">• List</button>
+        <button type="button" class="richtext-btn" data-cmd="insertOrderedList" title="Daftar bernomor">1. List</button>
+      </div>
+      <div class="ef_catatan richtext-editor" contenteditable="true" data-placeholder="Tulis notulensi di sini... (boleh copy-paste dari Word/Google Docs)"></div>
     </div>
     <div class="field">
       <label>Ketidakhadiran</label>
@@ -2477,7 +2838,7 @@ function buildEditForm(e){
       <button type="button" class="btn-save ef_save">Simpan Perubahan</button>
     </div>
   `;
-  wrap.querySelector('.ef_catatan').value = e.catatan || '';
+  wrap.querySelector('.ef_catatan').innerHTML = renderNoteHTML(e.catatan || '');
   setJenisCheckboxGroup(wrap.querySelector('.ef_jenis_group'), wrap.querySelector('.ef_jenis_custom'), e.jenis);
   wrap.querySelector('.ef_topik_group').innerHTML = topikCheckboxGroupHTML('ef');
   setTopikCheckboxGroup(wrap.querySelector('.ef_topik_group'), e.topik);
@@ -2507,7 +2868,7 @@ function buildEditForm(e){
     e.link_yt = wrap.querySelector('.ef_link_yt').value.trim();
     e.judul = wrap.querySelector('.ef_judul').value.trim();
     e.tema = wrap.querySelector('.ef_tema').value.trim();
-    e.catatan = wrap.querySelector('.ef_catatan').value;
+    e.catatan = sanitizeNotulensiHTML(wrap.querySelector('.ef_catatan').innerHTML);
     e.ketidakhadiran = wrap.querySelector('.ef_ketidakhadiran').value.trim();
     e.attachments = [...e.attachments, ...newAttachments];
     e._date = parseTgl(e.tanggal);
@@ -2553,7 +2914,7 @@ function openAddModal(editId){
   document.getElementById('f_link_yt').value = e ? (e.link_yt||'') : '';
   document.getElementById('f_judul').value = e ? (e.judul||'') : '';
   document.getElementById('f_tema').value = e ? (e.tema||'') : '';
-  document.getElementById('f_catatan').value = e ? (e.catatan||'') : '';
+  document.getElementById('f_catatan').innerHTML = e ? renderNoteHTML(e.catatan||'') : '';
   document.getElementById('f_ketidakhadiran').value = e ? (e.ketidakhadiran||'') : '';
 
   const jenisGroupEl = document.getElementById('f_jenis_group');
@@ -2613,7 +2974,7 @@ addForm.addEventListener('submit', async (ev)=>{
     judul: document.getElementById('f_judul').value.trim(),
     tema: document.getElementById('f_tema').value.trim(),
     link_yt: document.getElementById('f_link_yt').value.trim(),
-    catatan: document.getElementById('f_catatan').value,
+    catatan: sanitizeNotulensiHTML(document.getElementById('f_catatan').innerHTML),
     ketidakhadiran: document.getElementById('f_ketidakhadiran').value.trim(),
   };
 
@@ -2876,7 +3237,7 @@ function tfsRenderNodes(nodes, treeKind, depth){
             '<span class="alumni-file-badge">'+tfsExt(f.name)+'</span>'+escapeHtmlAlumni(f.name) +
           '</a>' +
           (f.description ? '<div class="tfs-file-description">'+escapeHtmlAlumni(f.description)+'</div>' : '') +
-          '<button type="button" class="file-remove" data-tfs-tree="'+treeKind+'" data-tfs-delete="'+f.id+'">hapus</button>' +
+          '<button type="button" class="file-remove edit-only" data-tfs-tree="'+treeKind+'" data-tfs-delete="'+f.id+'">hapus</button>' +
         '</li>'
       ).join('') +
       texts.map(t =>
@@ -2884,7 +3245,7 @@ function tfsRenderNodes(nodes, treeKind, depth){
           '<a href="#" data-tfs-preview-text data-tfs-tree="'+treeKind+'" data-tfs-text-id="'+t.id+'">' +
             '<span class="alumni-file-badge">TEKS</span>'+escapeHtmlAlumni(t.name) +
           '</a>' +
-          '<button type="button" class="file-remove" data-tfs-tree="'+treeKind+'" data-tfs-delete="'+t.id+'">hapus</button>' +
+          '<button type="button" class="file-remove edit-only" data-tfs-tree="'+treeKind+'" data-tfs-delete="'+t.id+'">hapus</button>' +
         '</li>'
       ).join('') +
     '</ul>';
@@ -2893,7 +3254,7 @@ function tfsRenderNodes(nodes, treeKind, depth){
     html += '' +
       '<details class="alumni-folder" open data-tfs-id="'+fd.id+'">' +
         '<summary class="alumni-folder-name">📁 '+escapeHtmlAlumni(fd.name) +
-          '<span class="tfs-node-actions">' +
+          '<span class="tfs-node-actions edit-only">' +
             '<button type="button" class="tfs-mini-btn" data-tfs-tree="'+treeKind+'" data-tfs-add-folder="'+fd.id+'">+ Subfolder</button>' +
             '<button type="button" class="tfs-mini-btn" data-tfs-tree="'+treeKind+'" data-tfs-add-file="'+fd.id+'">+ File</button>' +
             (treeKind === 'tauris' ? '<button type="button" class="tfs-mini-btn" data-tfs-tree="'+treeKind+'" data-tfs-add-text="'+fd.id+'">+ Teks</button>' : '') +
@@ -3357,7 +3718,7 @@ function renderPemateriTable(){
       <td>${escapeHtmlAlumni(p.materi)||'-'}</td>
       <td>${escapeHtmlAlumni(p.caraAjar)||'-'}</td>
       <td>${riwCount>0 ? `<span class="riwayat-badge">${riwCount}x</span> <button type="button" class="pemateri-detail-btn" data-detail="${p.id}">lihat</button>` : '<span style="color:var(--ink-soft);font-size:12px;">Belum ada</span>'}</td>
-      <td>
+      <td class="edit-only">
         <button class="icon-btn edit-btn-pemateri" data-edit="${p.id}">✎ Edit</button>
         <button class="icon-btn danger delete-btn-pemateri" data-delete="${p.id}">🗑 Hapus</button>
       </td>
@@ -3508,7 +3869,7 @@ function renderUploadedFilesInto(folderName, ulEl){
   files.forEach((f, idx)=>{
     const li = document.createElement('li');
     li.className = 'alumni-file-item';
-    li.innerHTML = `<a href="${f.dataUrl}" download="${escapeHtmlAlumni(f.nama)}"><span class="alumni-file-badge">${fileBadge(f.nama)}</span>${escapeHtmlAlumni(f.nama)}</a><button type="button" class="file-remove" data-remove-file="${folderName}::${idx}">hapus</button>`;
+    li.innerHTML = `<a href="${f.dataUrl}" download="${escapeHtmlAlumni(f.nama)}"><span class="alumni-file-badge">${fileBadge(f.nama)}</span>${escapeHtmlAlumni(f.nama)}</a><button type="button" class="file-remove edit-only" data-remove-file="${folderName}::${idx}">hapus</button>`;
     ulEl.appendChild(li);
   });
 }
@@ -3525,7 +3886,7 @@ function addUploadButtonTo(folderBodyEl, folderName){
 
   const row = document.createElement('div');
   row.className = 'alumni-folder-upload-row';
-  row.innerHTML = `<button type="button" class="btn-upload-file" data-upload-target="${escapeHtmlAlumni(folderName)}">⇪ Upload File (PDF/Excel/PNG/Word)</button>`;
+  row.innerHTML = `<button type="button" class="btn-upload-file edit-only" data-upload-target="${escapeHtmlAlumni(folderName)}">⇪ Upload File (PDF/Excel/PNG/Word)</button>`;
   folderBodyEl.appendChild(row);
 }
 
