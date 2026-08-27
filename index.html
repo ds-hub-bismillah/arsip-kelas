@@ -1080,7 +1080,6 @@
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
 </head>
 <body>
 
@@ -2543,10 +2542,32 @@ function renderNoteHTML(text){
 // ---------- Export Catatan Notulensi ke Word (.docx), berdasarkan rentang tanggal ----------
 // Dipakai baik oleh viewer maupun editor (murni aksi baca/unduh, tidak menulis apapun ke
 // database) -- makanya tombolnya TIDAK ditandai "edit-only".
-async function exportCatatanToDocx(startDateStr, endDateStr){
-  if(typeof docx === 'undefined' || !docx.Document || !docx.Packer || !docx.Paragraph){
-    throw new Error('Pustaka pembuat Word gagal dimuat dengan benar. Periksa koneksi internet lalu muat ulang halaman.');
+// ---------- Export Catatan Notulensi ke Word, berdasarkan rentang tanggal ----------
+// Pendekatan sengaja dibuat sesederhana mungkin: bikin file HTML yang "menyamar" jadi Word
+// (ekstensi .doc, dengan penanda khusus MS Office di dalamnya) -- ini format lama yang SUDAH
+// dikenali Word secara native sejak lama, jadi TIDAK PERLU library pihak ketiga maupun akses
+// ke CDN sama sekali. Cukup 4 kolom paling penting: Tanggal, Pemateri, Judul, dan Notulensi.
+function escapeHtmlExport(text){
+  return String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Mengubah catatan (HTML kaya hasil rich-text editor ATAU teks polos lama) jadi teks polos
+// per-baris, KHUSUS untuk export -- beda dengan stripImageMarkers() yang dipakai di tempat lain
+// (cuplikan kartu/index pencarian), di sini batas paragraf/list sengaja disisipi baris baru dulu
+// supaya isi list/paragraf tidak nempel jadi satu baris panjang setelah tag HTML-nya dibuang.
+function htmlCatatanToPlainLines(text){
+  if(!looksLikeRichHTML(text)){
+    return text.replace(/\[\[IMG:[^\]]+\]\]/g, '').replace(/\n{3,}/g, '\n\n');
   }
+  const div = document.createElement('div');
+  div.innerHTML = sanitizeNotulensiHTML(text);
+  div.querySelectorAll('p, li, div, br, ul, ol').forEach(el=>{
+    el.insertAdjacentText('afterend', '\n');
+  });
+  return (div.textContent || '').replace(/\n{3,}/g, '\n\n');
+}
+
+async function exportCatatanToDocx(startDateStr, endDateStr){
   const start = new Date(startDateStr + 'T00:00:00');
   const end = new Date(endDateStr + 'T23:59:59');
   if(isNaN(start) || isNaN(end) || start > end){
@@ -2557,62 +2578,39 @@ async function exportCatatanToDocx(startDateStr, endDateStr){
     throw new Error('Tidak ada notulensi pada rentang tanggal ini.');
   }
 
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle } = docx;
-  const children = [];
+  let body = '';
+  body += '<h1 style="font-family:Calibri,Arial,sans-serif;color:#1E4034;">Arsip Notulensi &mdash; Darush Shalihat</h1>';
+  body += '<p style="font-family:Calibri,Arial,sans-serif;font-style:italic;color:#666666;">'
+        + escapeHtmlExport(startDateStr) + ' s.d. ' + escapeHtmlExport(endDateStr) + ' &bull; ' + filtered.length + ' sesi</p>';
+  body += '<hr>';
 
-  children.push(new Paragraph({
-    heading: HeadingLevel.TITLE,
-    text: 'Arsip Notulensi — Darush Shalihat'
-  }));
-  children.push(new Paragraph({
-    children: [new TextRun({ text: `${startDateStr} s.d. ${endDateStr}  •  ${filtered.length} sesi`, italics: true, color: '666666' })]
-  }));
-  children.push(new Paragraph({ text: '' }));
-
-  filtered.forEach((e, idx) => {
-    children.push(new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      text: `${e.tanggal}${e.jenis && e.jenis !== '-' ? ' — ' + e.jenis : ''}${e.judul ? ' — ' + e.judul : ''}`
-    }));
-    const metaLines = [
-      ['Pembicara', e.pembicara],
-      ['Tema', e.tema],
-      ['Topik', e.topik],
-      ['Link YouTube', e.link_yt],
-    ].filter(([, v]) => v && String(v).trim());
-    metaLines.forEach(([label, value]) => {
-      children.push(new Paragraph({
-        children: [
-          new TextRun({ text: label + ': ', bold: true }),
-          new TextRun({ text: String(value) }),
-        ]
-      }));
-    });
-    children.push(new Paragraph({ text: '' }));
+  filtered.forEach((e, idx)=>{
+    body += '<h2 style="font-family:Calibri,Arial,sans-serif;color:#1E4034;">' + escapeHtmlExport(e.tanggal) + '</h2>';
+    body += '<p style="font-family:Calibri,Arial,sans-serif;"><b>Pemateri:</b> ' + escapeHtmlExport(e.pembicara || '-') + '</p>';
+    body += '<p style="font-family:Calibri,Arial,sans-serif;"><b>Judul:</b> ' + escapeHtmlExport(e.judul || '-') + '</p>';
 
     // Catatan bisa berupa HTML kaya (rich-text) atau teks polos lama -- keduanya diseragamkan
-    // jadi teks polos per-baris untuk Word (docx generik tidak perlu tahu soal HTML sumbernya).
-    const plainCatatan = e.catatan ? stripImageMarkers(e.catatan) : '(Belum ada catatan)';
+    // jadi teks polos per-baris dulu, baru ditulis ulang sebagai paragraf HTML.
+    const plainCatatan = e.catatan ? htmlCatatanToPlainLines(e.catatan) : '(Belum ada catatan)';
+    body += '<div style="font-family:Calibri,Arial,sans-serif;">';
     plainCatatan.split('\n').forEach(line=>{
-      if(line.trim()) children.push(new Paragraph({ text: line }));
+      if(line.trim()) body += '<p>' + escapeHtmlExport(line) + '</p>';
     });
+    body += '</div>';
 
-    if(idx < filtered.length - 1){
-      children.push(new Paragraph({ text: '' }));
-      children.push(new Paragraph({
-        border: { bottom: { color: 'CCCCCC', space: 4, style: BorderStyle.SINGLE, size: 6 } },
-        text: ''
-      }));
-      children.push(new Paragraph({ text: '' }));
-    }
+    if(idx < filtered.length - 1) body += '<hr>';
   });
 
-  const doc = new Document({ sections: [{ children }] });
-  const blob = await Packer.toBlob(doc);
+  const fullHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+    + '<head><meta charset="utf-8"><title>Export Notulensi</title>'
+    + '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'
+    + '</head><body>' + body + '</body></html>';
+
+  const blob = new Blob(['\ufeff', fullHtml], { type: 'application/msword' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Notulensi_${startDateStr}_sd_${endDateStr}.docx`;
+  a.download = `Notulensi_${startDateStr}_sd_${endDateStr}.doc`;
   document.body.appendChild(a);
   a.click();
   a.remove();
