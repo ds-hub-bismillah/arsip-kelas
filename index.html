@@ -330,7 +330,7 @@
     position:relative;
     margin:6px 0 4px;
   }
-  .catatan-preview.expanded{max-height:none;}
+  .catatan-preview.expanded{max-height:none; text-align:justify;}
   .catatan-preview.expanded ul, .catatan-preview.expanded ol{margin:6px 0 6px 22px; padding:0;}
   .catatan-preview.expanded b, .catatan-preview.expanded strong{font-weight:700;}
   .catatan-preview.expanded i, .catatan-preview.expanded em{font-style:italic;}
@@ -439,6 +439,17 @@
   }
   .sidebar-account-btn:hover{background:rgba(255,255,255,.08);}
 
+  /* ---------- Modal Pengaturan ---------- */
+  .settings-section{
+    padding:14px 0; border-top:1px solid var(--line);
+  }
+  .settings-section:first-of-type{border-top:none; padding-top:0;}
+  .settings-label{
+    display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px;
+    text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin-bottom:6px;
+  }
+  .settings-hint{font-size:12px; color:var(--ink-soft); margin:0 0 10px; line-height:1.5;}
+
   /* ---------- Mode viewer: sembunyikan semua elemen aksi tulis (tandai class "edit-only") ---------- */
   .role-viewer .edit-only{display:none !important;}
 
@@ -503,6 +514,7 @@
   .content-area{
     flex:1;
     min-width:0;
+    max-width:100%;
   }
   .page{display:none;}
   .page.active{display:block;}
@@ -681,8 +693,20 @@
     margin-bottom:8px;
   }
   @media (max-width:640px){
-    .module-table-wrap{overflow-x:auto;}
-    .module-table{min-width:560px;}
+    .module-table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+    .module-table{min-width:560px; font-size:12.5px;}
+    .module-table th{padding:8px 10px; font-size:9.5px;}
+    .module-table td{padding:8px 10px;}
+    /* Kolom pendek (No/Nama/Angkatan/Kontak/Aksi) dikunci supaya tidak wrap jadi
+       terpotong-potong per huruf; kolom isian panjang tetap boleh wrap normal. */
+    .module-table--pemateri{min-width:760px;}
+    .module-table--pemateri th:nth-child(1), .module-table--pemateri td:nth-child(1),
+    .module-table--pemateri th:nth-child(2), .module-table--pemateri td:nth-child(2),
+    .module-table--pemateri th:nth-child(3), .module-table--pemateri td:nth-child(3),
+    .module-table--pemateri th:nth-child(4), .module-table--pemateri td:nth-child(4),
+    .module-table--pemateri th:nth-child(8), .module-table--pemateri td:nth-child(8){
+      white-space:nowrap; overflow-wrap:normal; word-break:normal;
+    }
   }
 
   /* ---------- Alumni: Materi & Arsip Angkatan ---------- */
@@ -913,6 +937,7 @@
     padding:10px 12px;
     outline:none;
     overflow-y:auto;
+    text-align:justify;
   }
   .richtext-editor:focus{border-color:var(--brass);}
   .richtext-editor:empty::before{
@@ -1045,6 +1070,7 @@
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5/build/index.umd.min.js"></script>
 </head>
 <body>
 
@@ -1083,8 +1109,7 @@
     </div>
     <div class="sidebar-account">
       <div class="sidebar-role-badge" id="sidebarRoleBadge"></div>
-      <button type="button" class="sidebar-account-btn edit-only" id="changeViewerPasswordBtn">🔑 Ganti Password Viewer</button>
-      <button type="button" class="sidebar-account-btn" id="logoutBtn">↩ Keluar</button>
+      <button type="button" class="sidebar-account-btn" id="openSettingsBtn">⚙ Pengaturan</button>
     </div>
   </nav>
 
@@ -1139,6 +1164,10 @@
     <div class="filter-dropdown-row">
       <select id="jenisFilterSelect"><option value="">Semua Jenis Kelas</option></select>
       <select id="topikFilterSelect"><option value="">Semua Topik Materi</option></select>
+      <select id="sortOrderSelect">
+        <option value="asc">Terlama → Terbaru</option>
+        <option value="desc">Terbaru → Terlama</option>
+      </select>
       <button type="button" class="btn-admin-subtle edit-only" id="manageTopikBtn">⚙ Kelola Tag</button>
     </div>
     <div class="result-count"><span id="resultCount">0</span> sesi ditampilkan</div>
@@ -1303,12 +1332,57 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="settingsOverlay">
+    <div class="modal-box" style="max-width:460px;">
+      <h3>Pengaturan</h3>
+
+      <div class="settings-section">
+        <label class="settings-label">Export Catatan Notulensi</label>
+        <p class="settings-hint">Unduh seluruh notulensi (semua kolom: pembicara, judul, tema, topik, link YouTube, dan isi catatan) dalam rentang tanggal tertentu sebagai satu file Word.</p>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <div class="field" style="margin:0; flex:1;">
+            <label for="exportStartDate">Dari tanggal</label>
+            <input type="date" id="exportStartDate">
+          </div>
+          <div class="field" style="margin:0; flex:1;">
+            <label for="exportEndDate">Sampai tanggal</label>
+            <input type="date" id="exportEndDate">
+          </div>
+        </div>
+        <button type="button" class="btn-save" id="exportDocxBtn" style="width:100%;">⬇ Export ke Word</button>
+        <div class="login-error" id="exportError"></div>
+      </div>
+
+      <div class="settings-section edit-only">
+        <label class="settings-label">Akses Viewer</label>
+        <button type="button" class="btn-ghost" id="openChangeViewerPasswordBtn" style="width:100%;">🔑 Ganti Password Viewer</button>
+      </div>
+
+      <div class="settings-section edit-only">
+        <label class="settings-label">Akun Saya</label>
+        <button type="button" class="btn-ghost" id="openChangeMyPasswordBtn" style="width:100%;">🔒 Ganti Password Saya</button>
+      </div>
+
+      <div class="settings-section">
+        <button type="button" class="icon-btn danger" id="logoutBtn" style="width:100%; justify-content:center;">↩ Keluar dari Sesi Ini</button>
+      </div>
+
+      <div class="form-actions" style="margin-top:16px;">
+        <button type="button" class="btn-cancel" id="settingsCloseBtn">Tutup</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="changeViewerPasswordOverlay">
     <div class="modal-box" style="max-width:420px;">
       <h3>Ganti Password Viewer</h3>
       <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-6px;">Password baru ini akan langsung berlaku untuk siapapun yang login sebagai viewer setelahnya. Bagikan password baru ini ke orang yang perlu akses lihat-saja.</p>
       <form id="changeViewerPasswordForm">
         <div class="field">
+          <label for="currentEditorPasswordInput">Konfirmasi Password Editor (Kamu)</label>
+          <input type="password" id="currentEditorPasswordInput" placeholder="Password editor saat ini" required autocomplete="current-password">
+        </div>
+        <div class="field" style="margin-top:10px;">
           <label for="newViewerPasswordInput">Password Baru untuk Viewer</label>
           <input type="text" id="newViewerPasswordInput" placeholder="Minimal 8 karakter" required minlength="8">
         </div>
@@ -1316,6 +1390,28 @@
         <div class="form-actions" style="margin-top:16px;">
           <button type="button" class="btn-cancel" id="changeViewerPasswordCancelBtn">Batal</button>
           <button type="submit" class="btn-save" id="changeViewerPasswordSubmitBtn">Simpan Password Baru</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="changeMyPasswordOverlay">
+    <div class="modal-box" style="max-width:420px;">
+      <h3>Ganti Password Saya</h3>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-6px;">Mengganti password akun editor kamu sendiri. Setelah diganti, kamu tetap login (tidak perlu login ulang), tapi pakai password baru ini untuk login berikutnya.</p>
+      <form id="changeMyPasswordForm">
+        <div class="field">
+          <label for="myCurrentPasswordInput">Password Saat Ini</label>
+          <input type="password" id="myCurrentPasswordInput" placeholder="Password editor saat ini" required autocomplete="current-password">
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label for="myNewPasswordInput">Password Baru</label>
+          <input type="text" id="myNewPasswordInput" placeholder="Minimal 8 karakter" required minlength="8">
+        </div>
+        <div class="login-error" id="changeMyPasswordError"></div>
+        <div class="form-actions" style="margin-top:16px;">
+          <button type="button" class="btn-cancel" id="changeMyPasswordCancelBtn">Batal</button>
+          <button type="submit" class="btn-save" id="changeMyPasswordSubmitBtn">Simpan Password Baru</button>
         </div>
       </form>
     </div>
@@ -1373,7 +1469,7 @@
       </div>
 
       <div class="module-table-wrap">
-        <table class="module-table">
+        <table class="module-table module-table--pemateri">
           <thead>
             <tr>
               <th>No</th>
@@ -1482,16 +1578,30 @@ document.getElementById('loginForm').addEventListener('submit', async (ev)=>{
   }
 });
 
+// ---------- Modal Pengaturan (gerbang ke: export catatan, ganti password viewer, keluar) ----------
+document.getElementById('openSettingsBtn').addEventListener('click', ()=>{
+  document.getElementById('exportError').textContent = '';
+  document.getElementById('settingsOverlay').classList.add('open');
+});
+document.getElementById('settingsCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('settingsOverlay').classList.remove('open');
+});
+document.getElementById('settingsOverlay').addEventListener('click', (ev)=>{
+  if(ev.target.id === 'settingsOverlay') ev.target.classList.remove('open');
+});
+
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   if(!confirm('Keluar dari sesi ini?')) return;
   await window.authClient.auth.signOut();
   location.reload();
 });
 
-// ---------- Ganti Password Viewer (khusus editor) ----------
-document.getElementById('changeViewerPasswordBtn').addEventListener('click', ()=>{
+// ---------- Ganti Password Viewer (khusus editor) -- dibuka dari dalam modal Pengaturan ----------
+document.getElementById('openChangeViewerPasswordBtn').addEventListener('click', ()=>{
+  document.getElementById('currentEditorPasswordInput').value = '';
   document.getElementById('newViewerPasswordInput').value = '';
   document.getElementById('changeViewerPasswordError').textContent = '';
+  document.getElementById('settingsOverlay').classList.remove('open');
   document.getElementById('changeViewerPasswordOverlay').classList.add('open');
 });
 document.getElementById('changeViewerPasswordCancelBtn').addEventListener('click', ()=>{
@@ -1502,6 +1612,7 @@ document.getElementById('changeViewerPasswordOverlay').addEventListener('click',
 });
 document.getElementById('changeViewerPasswordForm').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
+  const currentEditorPassword = document.getElementById('currentEditorPasswordInput').value;
   const newPassword = document.getElementById('newViewerPasswordInput').value;
   const errEl = document.getElementById('changeViewerPasswordError');
   const btn = document.getElementById('changeViewerPasswordSubmitBtn');
@@ -1511,8 +1622,23 @@ document.getElementById('changeViewerPasswordForm').addEventListener('submit', a
     return;
   }
   btn.disabled = true;
-  btn.textContent = 'Menyimpan…';
+  btn.textContent = 'Memverifikasi…';
   try{
+    // Langkah re-autentikasi: pastikan yang klik tombol ini BENAR-BENAR tahu password
+    // editor saat ini, bukan cuma memanfaatkan sesi login yang kebetulan masih aktif
+    // (misal di komputer bersama/lupa logout). signInWithPassword ke akun editor sendiri
+    // dipakai sebagai cara memverifikasi tanpa perlu endpoint terpisah.
+    const { error: reauthErr } = await window.authClient.auth.signInWithPassword({
+      email: EDITOR_EMAIL,
+      password: currentEditorPassword,
+    });
+    if(reauthErr){
+      errEl.textContent = 'Password editor yang kamu masukkan salah.';
+      btn.disabled = false; btn.textContent = 'Simpan Password Baru';
+      return;
+    }
+
+    btn.textContent = 'Menyimpan…';
     const { data: { session } } = await window.authClient.auth.getSession();
     if(!session){
       errEl.textContent = 'Sesi login tidak ditemukan. Silakan login ulang.';
@@ -1537,6 +1663,69 @@ document.getElementById('changeViewerPasswordForm').addEventListener('submit', a
     document.getElementById('changeViewerPasswordOverlay').classList.remove('open');
   }catch(err){
     console.error('Gagal ganti password viewer:', err);
+    errEl.textContent = 'Terjadi kesalahan. Coba lagi.';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Simpan Password Baru';
+});
+
+// ---------- Ganti Password Saya (editor ganti password akun sendiri) ----------
+// Tidak perlu Edge Function/service key -- editor boleh ganti password akunnya sendiri
+// langsung lewat supabase.auth.updateUser(), selama sesi login masih valid. Tetap minta
+// masukkan password saat ini dulu (re-autentikasi) supaya bukan sekadar sesi yang kebetulan
+// masih aktif di komputer bersama yang bisa mengubahnya.
+document.getElementById('openChangeMyPasswordBtn').addEventListener('click', ()=>{
+  document.getElementById('myCurrentPasswordInput').value = '';
+  document.getElementById('myNewPasswordInput').value = '';
+  document.getElementById('changeMyPasswordError').textContent = '';
+  document.getElementById('settingsOverlay').classList.remove('open');
+  document.getElementById('changeMyPasswordOverlay').classList.add('open');
+});
+document.getElementById('changeMyPasswordCancelBtn').addEventListener('click', ()=>{
+  document.getElementById('changeMyPasswordOverlay').classList.remove('open');
+});
+document.getElementById('changeMyPasswordOverlay').addEventListener('click', (ev)=>{
+  if(ev.target.id === 'changeMyPasswordOverlay') ev.target.classList.remove('open');
+});
+document.getElementById('changeMyPasswordForm').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const currentPassword = document.getElementById('myCurrentPasswordInput').value;
+  const newPassword = document.getElementById('myNewPasswordInput').value;
+  const errEl = document.getElementById('changeMyPasswordError');
+  const btn = document.getElementById('changeMyPasswordSubmitBtn');
+  errEl.textContent = '';
+  if(newPassword.length < 8){
+    errEl.textContent = 'Password baru minimal 8 karakter.';
+    return;
+  }
+  if(newPassword === currentPassword){
+    errEl.textContent = 'Password baru tidak boleh sama dengan password lama.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Memverifikasi…';
+  try{
+    const { error: reauthErr } = await window.authClient.auth.signInWithPassword({
+      email: EDITOR_EMAIL,
+      password: currentPassword,
+    });
+    if(reauthErr){
+      errEl.textContent = 'Password saat ini yang kamu masukkan salah.';
+      btn.disabled = false; btn.textContent = 'Simpan Password Baru';
+      return;
+    }
+
+    btn.textContent = 'Menyimpan…';
+    const { error: updateErr } = await window.authClient.auth.updateUser({ password: newPassword });
+    if(updateErr){
+      errEl.textContent = updateErr.message || 'Gagal menyimpan password baru.';
+      btn.disabled = false; btn.textContent = 'Simpan Password Baru';
+      return;
+    }
+    alert('Password kamu berhasil diganti. Pakai password baru ini untuk login berikutnya.');
+    document.getElementById('changeMyPasswordOverlay').classList.remove('open');
+  }catch(err){
+    console.error('Gagal ganti password sendiri:', err);
     errEl.textContent = 'Terjadi kesalahan. Coba lagi.';
   }
   btn.disabled = false;
@@ -1866,6 +2055,17 @@ let activeTopik = null;
 let activeAngkatanNotulensi = null; // diisi/dipakai setelah daftar ANGKATAN_OPTIONS siap (modul Alumni)
 const jenisFilterSelect = document.getElementById('jenisFilterSelect');
 const topikFilterSelect = document.getElementById('topikFilterSelect');
+
+// ---------- Urutan tampilan: Terlama→Terbaru (default) atau Terbaru→Terlama ----------
+// `events` sendiri selalu tetap terurut ascending (lihat events.sort() di loadEvents()) --
+// bagian lain kode (statistik, dsb) mengasumsikan itu. Urutan tampilan di sini HANYA memutar-
+// balik array HASIL FILTER saat dirender, tidak menyentuh array `events` global.
+let notulensiSortDesc = false;
+document.getElementById('sortOrderSelect').addEventListener('change', (e)=>{
+  notulensiSortDesc = e.target.value === 'desc';
+  resetPagination();
+  render();
+});
 
 function splitJenis(jenisStr){
   return (jenisStr||'').split(',').map(s=>s.trim()).filter(s=>s && s!=='-');
@@ -2284,6 +2484,107 @@ function renderNoteHTML(text){
   }).join('');
 }
 
+// ---------- Export Catatan Notulensi ke Word (.docx), berdasarkan rentang tanggal ----------
+// Dipakai baik oleh viewer maupun editor (murni aksi baca/unduh, tidak menulis apapun ke
+// database) -- makanya tombolnya TIDAK ditandai "edit-only".
+async function exportCatatanToDocx(startDateStr, endDateStr){
+  if(typeof docx === 'undefined'){
+    throw new Error('Pustaka pembuat Word gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.');
+  }
+  const start = new Date(startDateStr + 'T00:00:00');
+  const end = new Date(endDateStr + 'T23:59:59');
+  if(isNaN(start) || isNaN(end) || start > end){
+    throw new Error('Rentang tanggal tidak valid.');
+  }
+  const filtered = events.filter(e => e._date >= start && e._date <= end).sort((a,b)=>a._date-b._date);
+  if(!filtered.length){
+    throw new Error('Tidak ada notulensi pada rentang tanggal ini.');
+  }
+
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle } = docx;
+  const children = [];
+
+  children.push(new Paragraph({
+    heading: HeadingLevel.TITLE,
+    text: 'Arsip Notulensi — Darush Shalihat'
+  }));
+  children.push(new Paragraph({
+    children: [new TextRun({ text: `${startDateStr} s.d. ${endDateStr}  •  ${filtered.length} sesi`, italics: true, color: '666666' })]
+  }));
+  children.push(new Paragraph({ text: '' }));
+
+  filtered.forEach((e, idx) => {
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      text: `${e.tanggal}${e.jenis && e.jenis !== '-' ? ' — ' + e.jenis : ''}${e.judul ? ' — ' + e.judul : ''}`
+    }));
+    const metaLines = [
+      ['Pembicara', e.pembicara],
+      ['Tema', e.tema],
+      ['Topik', e.topik],
+      ['Link YouTube', e.link_yt],
+    ].filter(([, v]) => v && String(v).trim());
+    metaLines.forEach(([label, value]) => {
+      children.push(new Paragraph({
+        children: [
+          new TextRun({ text: label + ': ', bold: true }),
+          new TextRun({ text: String(value) }),
+        ]
+      }));
+    });
+    children.push(new Paragraph({ text: '' }));
+
+    // Catatan bisa berupa HTML kaya (rich-text) atau teks polos lama -- keduanya diseragamkan
+    // jadi teks polos per-baris untuk Word (docx generik tidak perlu tahu soal HTML sumbernya).
+    const plainCatatan = e.catatan ? stripImageMarkers(e.catatan) : '(Belum ada catatan)';
+    plainCatatan.split('\n').forEach(line=>{
+      if(line.trim()) children.push(new Paragraph({ text: line }));
+    });
+
+    if(idx < filtered.length - 1){
+      children.push(new Paragraph({ text: '' }));
+      children.push(new Paragraph({
+        border: { bottom: { color: 'CCCCCC', space: 4, style: BorderStyle.SINGLE, size: 6 } },
+        text: ''
+      }));
+      children.push(new Paragraph({ text: '' }));
+    }
+  });
+
+  const doc = new Document({ sections: [{ children }] });
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Notulensi_${startDateStr}_sd_${endDateStr}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+}
+
+document.getElementById('exportDocxBtn').addEventListener('click', async ()=>{
+  const startVal = document.getElementById('exportStartDate').value;
+  const endVal = document.getElementById('exportEndDate').value;
+  const errEl = document.getElementById('exportError');
+  const btn = document.getElementById('exportDocxBtn');
+  errEl.textContent = '';
+  if(!startVal || !endVal){
+    errEl.textContent = 'Pilih tanggal awal dan akhir dulu.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Menyiapkan file…';
+  try{
+    await exportCatatanToDocx(startVal, endVal);
+  }catch(err){
+    console.error('Gagal export catatan:', err);
+    errEl.textContent = err.message || 'Gagal membuat file Word.';
+  }
+  btn.disabled = false;
+  btn.textContent = '⬇ Export ke Word';
+});
+
 // ---------- Toolbar rich-text (Bold/Italic/Bullet/Nomor) untuk field Catatan/Notulensi ----------
 // Dipakai delegasi supaya bekerja baik untuk toolbar statis di modal tambah/edit (#f_catatan)
 // maupun toolbar yang baru dibuat setiap kali kartu notulensi dibuka mode edit-inline (.ef_catatan).
@@ -2482,13 +2783,18 @@ function render(){
 
   document.getElementById('resultCount').textContent = filtered.length;
 
-  // [PAGINATION] Potong `filtered` menjadi `visibleEntries` SEBELUM proses
+  // Urutan tampilan: `filtered` (turunan dari `events`) selalu ascending (terlama dulu) --
+  // kalau mode "Terbaru → Terlama" aktif, balik urutannya di sini saja (murah, tidak perlu
+  // sort ulang berdasarkan tanggal karena sumbernya memang sudah terurut).
+  const ordered = notulensiSortDesc ? filtered.slice().reverse() : filtered;
+
+  // [PAGINATION] Potong `ordered` menjadi `visibleEntries` SEBELUM proses
   // grouping bulan & build kartu dimulai. Urutan data (events.sort by _date)
   // tidak diubah, jadi slice(0, renderedCount) selalu mengambil N sesi paling
-  // awal secara kronologis dari hasil filter saat ini — grouping bulan di
+  // awal dari hasil filter+urutan saat ini — grouping bulan di
   // bawah tetap memproses visibleEntries secara berurutan seperti biasa,
   // sehingga header bulan tidak bisa dobel/hilang/salah urutan.
-  const visibleEntries = filtered.slice(0, renderedCount);
+  const visibleEntries = ordered.slice(0, renderedCount);
 
   // ---- Preservasi perilaku lama --------------------------------------
   // Sebelumnya, SETIAP kali render() dipanggil (apa pun pemicunya — ganti
