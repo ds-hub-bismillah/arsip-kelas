@@ -677,6 +677,10 @@
     overflow-wrap:anywhere;
     word-break:break-word;
   }
+  /* Tabel Koneksi DS dibikin lebih compact -- jarak teks ke garis tabel dikecilin. */
+  .module-table--pemateri th{padding:8px 10px;}
+  .module-table--pemateri td{padding:8px 10px; vertical-align:middle;}
+  .module-table--pemateri .icon-btn{padding:6px 9px; font-size:14px; line-height:1;}
   .module-table tbody tr:last-child td{border-bottom:none;}
   .module-table .empty-row td{
     text-align:center;
@@ -1070,7 +1074,7 @@
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx@8.5/build/index.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
 </head>
 <body>
 
@@ -1108,7 +1112,6 @@
       </button>
     </div>
     <div class="sidebar-account">
-      <div class="sidebar-role-badge" id="sidebarRoleBadge"></div>
       <button type="button" class="sidebar-account-btn" id="openSettingsBtn">⚙ Pengaturan</button>
     </div>
   </nav>
@@ -1335,10 +1338,10 @@
   <div class="modal-overlay" id="settingsOverlay">
     <div class="modal-box" style="max-width:460px;">
       <h3>Pengaturan</h3>
+      <div class="sidebar-role-badge" id="sidebarRoleBadge" style="padding:0 0 14px; color:var(--ink-soft);"></div>
 
       <div class="settings-section">
         <label class="settings-label">Export Catatan Notulensi</label>
-        <p class="settings-hint">Unduh seluruh notulensi (semua kolom: pembicara, judul, tema, topik, link YouTube, dan isi catatan) dalam rentang tanggal tertentu sebagai satu file Word.</p>
         <div style="display:flex; gap:8px; margin-bottom:10px;">
           <div class="field" style="margin:0; flex:1;">
             <label for="exportStartDate">Dari tanggal</label>
@@ -1355,12 +1358,12 @@
 
       <div class="settings-section edit-only">
         <label class="settings-label">Akses Viewer</label>
-        <button type="button" class="btn-ghost" id="openChangeViewerPasswordBtn" style="width:100%;">🔑 Ganti Password Viewer</button>
+        <button type="button" class="btn-ghost" id="openChangeViewerPasswordBtn" style="width:100%;">Ganti Password Viewer</button>
       </div>
 
       <div class="settings-section edit-only">
         <label class="settings-label">Akun Saya</label>
-        <button type="button" class="btn-ghost" id="openChangeMyPasswordBtn" style="width:100%;">🔒 Ganti Password Saya</button>
+        <button type="button" class="btn-ghost" id="openChangeMyPasswordBtn" style="width:100%;">Ganti Password Saya</button>
       </div>
 
       <div class="settings-section">
@@ -1414,6 +1417,17 @@
           <button type="submit" class="btn-save" id="changeMyPasswordSubmitBtn">Simpan Password Baru</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="customConfirmOverlay">
+    <div class="modal-box" style="max-width:400px;">
+      <h3 id="customConfirmTitle">Konfirmasi</h3>
+      <p id="customConfirmMessage" style="font-size:13.5px; color:var(--ink-soft); line-height:1.6; margin:0;"></p>
+      <div class="form-actions" style="margin-top:18px;">
+        <button type="button" class="btn-cancel" id="customConfirmCancelBtn">Batal</button>
+        <button type="button" class="btn-save" id="customConfirmOkBtn">OK</button>
+      </div>
     </div>
   </div>
 
@@ -1517,6 +1531,35 @@ window.authClient = (typeof supabase !== 'undefined')
   ? supabase.createClient(AUTH_SUPABASE_URL, AUTH_SUPABASE_ANON_KEY)
   : null;
 
+// ---------- Dialog konfirmasi custom (pengganti window.confirm() bawaan browser) ----------
+// window.confirm() selalu menampilkan nama domain situs ("xxx.github.io says") yang tidak bisa
+// dihilangkan/disesuaikan -- ini dialog pengganti bergaya sama dengan modal lain di aplikasi,
+// dipakai di SELURUH halaman lewat window.appConfirm(pesan[, judul]). Mengembalikan Promise<boolean>
+// supaya bisa dipakai dengan `await` persis seperti pola confirm() yang lama (tinggal tambah await).
+window.appConfirm = function(message, title){
+  return new Promise((resolve)=>{
+    document.getElementById('customConfirmTitle').textContent = title || 'Konfirmasi';
+    document.getElementById('customConfirmMessage').textContent = message;
+    const overlay = document.getElementById('customConfirmOverlay');
+    const okBtn = document.getElementById('customConfirmOkBtn');
+    const cancelBtn = document.getElementById('customConfirmCancelBtn');
+    function cleanup(result){
+      overlay.classList.remove('open');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      overlay.removeEventListener('click', onOverlayClick);
+      resolve(result);
+    }
+    function onOk(){ cleanup(true); }
+    function onCancel(){ cleanup(false); }
+    function onOverlayClick(ev){ if(ev.target === overlay) cleanup(false); }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onOverlayClick);
+    overlay.classList.add('open');
+  });
+};
+
 function applyAuthRole(role){
   document.body.classList.remove('role-viewer', 'role-editor');
   document.body.classList.add(role === 'editor' ? 'role-editor' : 'role-viewer');
@@ -1591,7 +1634,7 @@ document.getElementById('settingsOverlay').addEventListener('click', (ev)=>{
 });
 
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{
-  if(!confirm('Keluar dari sesi ini?')) return;
+  if(!await appConfirm('Keluar dari sesi ini?')) return;
   await window.authClient.auth.signOut();
   location.reload();
 });
@@ -2235,7 +2278,7 @@ document.getElementById('topikManageTableBody').addEventListener('click', async 
   const delBtn = e.target.closest('[data-delete-topik]');
   if(delBtn){
     const tag = delBtn.dataset.deleteTopik;
-    if(!confirm(`Hapus tag "${tag}"? Notulensi yang sudah pakai tag ini akan kehilangan tag tersebut.`)) return;
+    if(!await appConfirm(`Hapus tag "${tag}"? Notulensi yang sudah pakai tag ini akan kehilangan tag tersebut.`)) return;
     TOPIK_OPTIONS = TOPIK_OPTIONS.filter(t => t!==tag);
     await saveTopikOptions();
     const changed = [];
@@ -2488,8 +2531,8 @@ function renderNoteHTML(text){
 // Dipakai baik oleh viewer maupun editor (murni aksi baca/unduh, tidak menulis apapun ke
 // database) -- makanya tombolnya TIDAK ditandai "edit-only".
 async function exportCatatanToDocx(startDateStr, endDateStr){
-  if(typeof docx === 'undefined'){
-    throw new Error('Pustaka pembuat Word gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.');
+  if(typeof docx === 'undefined' || !docx.Document || !docx.Packer || !docx.Paragraph){
+    throw new Error('Pustaka pembuat Word gagal dimuat dengan benar. Periksa koneksi internet lalu muat ulang halaman.');
   }
   const start = new Date(startDateStr + 'T00:00:00');
   const end = new Date(endDateStr + 'T23:59:59');
@@ -2975,7 +3018,7 @@ main.addEventListener('click', async function(clickEvent){
     const id = card.dataset.id;
     const data = events.find(x=>x._id===id);
     const title = data ? (data.tema || data.judul || '(Tanpa judul/tema tercatat)') : '';
-    if(confirm(`Hapus notulensi "${title}"? Tindakan ini tidak bisa dibatalkan.`)){
+    if(await appConfirm(`Hapus notulensi "${title}"? Tindakan ini tidak bisa dibatalkan.`)){
       const ok = await deleteEventRemote(id);
       if(!ok) return; // batal hapus dari tampilan kalau gagal dihapus di server
       events = events.filter(x=>x._id !== id);
@@ -3061,7 +3104,7 @@ main.addEventListener('click', async function(clickEvent){
 
   const deleteComment = clickEvent.target.closest('.comment-delete');
   if(deleteComment){
-    if(!confirm('Hapus komentar ini beserta semua balasannya?')) return;
+    if(!await appConfirm('Hapus komentar ini beserta semua balasannya?')) return;
     const card = deleteComment.closest('.event');
     const id = card.dataset.id;
     const e = events.find(x=>x._id===id);
@@ -3859,7 +3902,7 @@ document.addEventListener('click', async (ev) => {
     const root = tree.getRoot();
     const node = tfsFindNode(root, id);
     const label = node ? (node.type === 'folder' ? 'folder' : node.type === 'text' ? 'catatan teks' : 'file') : 'item';
-    if(node && confirm('Hapus '+label+' "'+node.name+'"'+(node.type==='folder' ? ' beserta seluruh isinya' : '')+'?')){
+    if(node && await appConfirm('Hapus '+label+' "'+node.name+'"'+(node.type==='folder' ? ' beserta seluruh isinya' : '')+'?')){
       const parentArr = tfsFindParentArray(root, id);
       if(parentArr){
         const idx = parentArr.findIndex(n => n.id === id);
@@ -4025,8 +4068,8 @@ function renderPemateriTable(){
       <td>${escapeHtmlAlumni(p.caraAjar)||'-'}</td>
       <td>${riwCount>0 ? `<span class="riwayat-badge">${riwCount}x</span> <button type="button" class="pemateri-detail-btn" data-detail="${p.id}">lihat</button>` : '<span style="color:var(--ink-soft);font-size:12px;">Belum ada</span>'}</td>
       <td class="edit-only">
-        <button class="icon-btn edit-btn-pemateri" data-edit="${p.id}">✎ Edit</button>
-        <button class="icon-btn danger delete-btn-pemateri" data-delete="${p.id}">🗑 Hapus</button>
+        <button class="icon-btn edit-btn-pemateri" data-edit="${p.id}" title="Edit" aria-label="Edit">✎</button>
+        <button class="icon-btn danger delete-btn-pemateri" data-delete="${p.id}" title="Hapus" aria-label="Hapus">🗑</button>
       </td>
     </tr>`;
   }).join('');
@@ -4136,7 +4179,7 @@ document.getElementById('pemateriTableBody').addEventListener('click', async (e)
   const delBtn = e.target.closest('.delete-btn-pemateri');
   if(delBtn){
     const id = Number(delBtn.dataset.delete);
-    if(confirm('Hapus data pemateri ini?')){
+    if(await appConfirm('Hapus data pemateri ini?')){
       pemateriData = pemateriData.filter(x=>x.id!==id);
       await savePemateriData();
       renderPemateriTable();
@@ -4231,7 +4274,7 @@ document.addEventListener('click', async (e)=>{
   if(removeFileBtn){
     const [folderName, idxStr] = removeFileBtn.dataset.removeFile.split('::');
     const idx = Number(idxStr);
-    if(confirm('Hapus file ini?')){
+    if(await appConfirm('Hapus file ini?')){
       alumniFolders[folderName].splice(idx,1);
       await saveAlumniFolders();
       refreshFolderView();
@@ -4408,7 +4451,7 @@ document.getElementById('angkatanManageTableBody').addEventListener('click', asy
   const btn = e.target.closest('[data-delete-angkatan]');
   if(!btn) return;
   const val = btn.dataset.deleteAngkatan;
-  if(!confirm(`Hapus angkatan "${val}"?`)) return;
+  if(!await appConfirm(`Hapus angkatan "${val}"?`)) return;
   ANGKATAN_OPTIONS = ANGKATAN_OPTIONS.filter(a=>a!==val);
   await saveAngkatanOptions();
   Object.keys(folderAngkatan).forEach(k=>{ if(folderAngkatan[k]===val) delete folderAngkatan[k]; });
