@@ -438,6 +438,11 @@
     padding:8px 10px; text-align:left; cursor:pointer; transition:background .15s;
   }
   .sidebar-account-btn:hover{background:rgba(255,255,255,.08);}
+  .sidebar-account-btn--icon{
+    width:36px; height:36px; padding:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:17px; border-radius:8px;
+  }
 
   /* ---------- Modal Pengaturan ---------- */
   .settings-section{
@@ -681,6 +686,7 @@
   .module-table--pemateri th{padding:8px 10px;}
   .module-table--pemateri td{padding:8px 10px; vertical-align:middle;}
   .module-table--pemateri .icon-btn{padding:6px 9px; font-size:14px; line-height:1;}
+  .module-table--pemateri th:nth-child(2), .module-table--pemateri td:nth-child(2){min-width:120px;}
   .module-table tbody tr:last-child td{border-bottom:none;}
   .module-table .empty-row td{
     text-align:center;
@@ -1112,7 +1118,7 @@
       </button>
     </div>
     <div class="sidebar-account">
-      <button type="button" class="sidebar-account-btn" id="openSettingsBtn">⚙ Pengaturan</button>
+      <button type="button" class="sidebar-account-btn sidebar-account-btn--icon" id="openSettingsBtn" title="Pengaturan" aria-label="Pengaturan">⚙</button>
     </div>
   </nav>
 
@@ -1481,6 +1487,13 @@
         </div>
         <button class="btn-add edit-only" type="button" id="addPemateriBtn">+ Tambah Koneksi</button>
       </div>
+      <div class="filter-dropdown-row" style="margin-bottom:16px;">
+        <select id="pemateriSortSelect">
+          <option value="">Urutkan: Tanpa Urutan</option>
+          <option value="riwayat_terbaru">Tanggal Dipanggil Terbaru</option>
+          <option value="riwayat_terlama">Tanggal Dipanggil Terlama</option>
+        </select>
+      </div>
 
       <div class="module-table-wrap">
         <table class="module-table module-table--pemateri">
@@ -1492,7 +1505,7 @@
               <th>Kontak</th>
               <th>Materi Dikuasai</th>
               <th>Cara Mengajar / Keterangan</th>
-              <th>Riwayat Dipanggil</th>
+              <th>Riwayat</th>
               <th>Aksi</th>
             </tr>
           </thead>
@@ -4042,13 +4055,32 @@ function escapeHtmlAlumni(s){
   return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Tanggal riwayat "dipanggil" TERBARU untuk satu koneksi (dipakai buat sortir) --
+// dikembalikan sebagai epoch ms, atau -Infinity kalau belum ada riwayat sama sekali
+// (biar konsisten selalu ke bawah baik diurutkan naik/turun).
+function latestRiwayatDate(p){
+  if(!p.riwayat || !p.riwayat.length) return -Infinity;
+  const dates = p.riwayat.map(r => {
+    const t = Date.parse(r.tanggal);
+    return isNaN(t) ? -Infinity : t;
+  });
+  return Math.max(...dates);
+}
+
 function renderPemateriTable(){
   const tbody = document.getElementById('pemateriTableBody');
   const q = (document.getElementById('pemateriSearch').value || '').trim().toLowerCase();
-  const filtered = pemateriData.filter(p=>{
+  let filtered = pemateriData.filter(p=>{
     if(!q) return true;
     return (p.nama+' '+p.angkatan+' '+p.materi).toLowerCase().includes(q);
   });
+
+  const sortMode = document.getElementById('pemateriSortSelect').value;
+  if(sortMode === 'riwayat_terbaru'){
+    filtered = filtered.slice().sort((a,b)=> latestRiwayatDate(b) - latestRiwayatDate(a));
+  } else if(sortMode === 'riwayat_terlama'){
+    filtered = filtered.slice().sort((a,b)=> latestRiwayatDate(a) - latestRiwayatDate(b));
+  }
 
   document.getElementById('statTotalPemateri').textContent = pemateriData.length;
 
@@ -4157,6 +4189,7 @@ document.getElementById('pemateriForm').addEventListener('submit', async (e)=>{
 });
 
 document.getElementById('pemateriSearch').addEventListener('input', renderPemateriTable);
+document.getElementById('pemateriSortSelect').addEventListener('change', renderPemateriTable);
 
 // ---------- Detail (lihat riwayat) modal ----------
 const detailOverlay = document.getElementById('pemateriDetailOverlay');
