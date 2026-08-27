@@ -1,0 +1,21 @@
+name: Jaga Supabase tetap aktif
+
+on:
+  schedule:
+    # Setiap Senin jam 02:00 UTC (~09:00 WIB) -- sekali seminggu sudah cukup untuk mencegah
+    # project Supabase di-pause otomatis karena dianggap tidak terpakai.
+    - cron: '0 2 * * 1'
+  workflow_dispatch: {}
+    # ^ ini bikin ada tombol "Run workflow" manual di tab Actions GitHub, buat coba tanpa
+    #   perlu nunggu jadwal mingguan.
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping tabel notulensi di Supabase
+        run: |
+          curl -s -o /dev/null -w "HTTP status: %{http_code}\n" \
+            "https://tuoakxfasrgwyxdhgapk.supabase.co/rest/v1/notulensi?select=id&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1b2FreGZhc3Jnd3l4ZGhnYXBrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyNjYzNzcsImV4cCI6MjEwMTg0MjM3N30.gi-0VMO2Jp6B4Usrj7sYOr_hkojnfW2AMgKxcuL34LU" \
+            --fail
